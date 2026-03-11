@@ -28,16 +28,16 @@
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        /* 標題字距與震懾力 - 改為相對單位以防斷行 */
+        /* 標題字距與震懾力 */
         .title-spacing { letter-spacing: 0.8em; text-indent: 0.8em; }
-        .sub-spacing { letter-spacing: 1.5em; text-indent: 1.5em; }
+        .sub-spacing { letter-spacing: 2em; text-indent: 2em; }
 
-        @media (max-width: 1024px) { 
+        @media (max-width: 768px) { 
             .title-spacing { letter-spacing: 0.3em !important; text-indent: 0.3em !important; } 
-            .sub-spacing { letter-spacing: 0.5em !important; text-indent: 0.5em !important; }
+            .sub-spacing { letter-spacing: 0.6em !important; text-indent: 0.6em !important; }
         }
         
-        .glow-text { text-shadow: 0 0 20px rgba(245, 158, 11, 0.6), 0 0 40px rgba(245, 158, 11, 0.4); }
+        .glow-text { text-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 0 40px rgba(245, 158, 11, 0.3); }
     </style>
 </head>
 <body class="custom-scrollbar overflow-x-hidden">
@@ -56,7 +56,7 @@
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【靈脈核心】
+        // 【靈脈核心】初始化
         // ==========================================
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
@@ -94,6 +94,7 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
+            // 認證流程
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -114,6 +115,7 @@
                 return () => unsubscribe();
             }, []);
 
+            // 數據同步
             useEffect(() => {
                 if (!user) return;
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
@@ -239,8 +241,8 @@
                         <div className="flex flex-col items-center gap-16 w-full px-8 text-center">
                             <div className="flex items-center justify-center gap-10 md:gap-24 whitespace-nowrap w-full">
                                 <div className="hidden sm:block h-[2px] flex-1 max-w-[200px] bg-gradient-to-r from-transparent to-amber-500" />
-                                <p className="text-amber-500 font-black tracking-[1.5em] text-xl md:text-4xl uppercase italic sub-spacing pl-[1.5em] drop-shadow-md whitespace-nowrap">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
-                                <div className="hidden sm:block h-[1px] flex-1 max-w-[200px] bg-gradient-to-l from-transparent to-amber-500" />
+                                <p className="text-amber-500 font-black tracking-[2em] text-xl md:text-4xl uppercase italic sub-spacing pl-[2em] drop-shadow-md">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
+                                <div className="hidden sm:block h-[2px] flex-1 max-w-[200px] bg-gradient-to-l from-transparent to-amber-500" />
                             </div>
                             <div className="max-w-5xl bg-amber-950/30 border-x-4 border-amber-500/40 p-12 backdrop-blur-xl mx-auto rounded-sm shadow-2xl">
                                 <p className="text-amber-300 text-lg md:text-2xl leading-relaxed tracking-[0.3em] font-black italic font-serif">我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。</p>
@@ -248,7 +250,7 @@
                         </div>
                     </header>
 
-                    <main className="max-w-[95rem] mx-auto px-12 -mt-48 relative z-30 pb-60 text-center">
+                    <main className="max-w-[90rem] mx-auto px-12 -mt-48 relative z-30 pb-60 text-center">
                         <div className="space-y-64 inline-block w-full">
                             {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
                                 <section key={batch} className="relative pt-32 w-full text-center">
@@ -322,7 +324,7 @@
                         <button onClick={() => setIsAdding(true)} className="fixed bottom-28 right-28 w-32 h-32 md:w-40 md:h-40 bg-[#0d4d30] text-emerald-50 border-8 border-emerald-700 shadow-[0_40px_100px_rgba(0,80,40,0.9)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[100] group rounded-full"><div className="text-center flex flex-col items-center"><Plus size={64} className="group-hover:rotate-180 transition-transform duration-700" /><div className="text-sm font-black tracking-[0.8em] uppercase mt-3">錄入</div></div></button>
                     </main>
 
-                    {/* Modal */}
+                    {/* Modal - 極大字體與明亮質感 */}
                     {isAdding && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-black/98 backdrop-blur-3xl text-left">
                             <div className="bg-[#1e1b18] border-[6px] border-amber-500/50 w-full max-w-6xl shadow-[0_0_200px_rgba(0,0,0,1)] rounded-sm p-16 md:p-24 max-h-[95vh] overflow-y-auto custom-scrollbar">
@@ -354,12 +356,12 @@
                         </div>
                     )}
 
-                    {/* Footer - 極致輝煌與防斷行校準 */}
-                    <footer className="max-w-[95rem] mx-auto mt-80 px-12 pb-60 text-center relative z-10 w-full flex flex-col items-center">
+                    {/* Footer - 全面輝煌化 */}
+                    <footer className="max-w-[90rem] mx-auto mt-80 px-12 pb-60 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[4px] w-full bg-gradient-to-r from-transparent via-amber-400/80 to-transparent mb-24" />
-                        <p className="text-4xl md:text-6xl font-black text-amber-400 font-serif text-center w-full sub-spacing pl-[1.5em] mb-16 glow-text whitespace-nowrap overflow-visible">江 湖 路 遠 · 終 會 在 遇</p>
-                        <p className="text-xl md:text-3xl tracking-[1em] mb-10 uppercase font-black text-amber-500 text-center w-full pl-[1em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
-                        <p className="text-lg md:text-xl tracking-[0.5em] font-black italic text-amber-600 text-center w-full block mb-24 opacity-100">自古英雄如美人 · 不許人間見白頭</p>
+                        <p className="text-4xl md:text-6xl font-black text-amber-400 font-serif text-center w-full sub-spacing pl-[2em] mb-16 glow-text">江 湖 路 遠 · 終 會 在 遇</p>
+                        <p className="text-xl md:text-3xl tracking-[1em] mb-8 uppercase font-black text-amber-500 text-center w-full pl-[1em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                        <p className="text-lg md:text-xl tracking-[0.5em] font-black italic text-amber-600 text-center w-full block mb-20 opacity-100">自古英雄如美人 · 不許人間見白頭</p>
                         
                         <div className="flex items-center gap-10 p-10 border-4 border-amber-400/40 bg-amber-950/20 rounded-lg shadow-3xl">
                             <div className={`w-6 h-6 rounded-full ${user ? 'bg-emerald-400 shadow-[0_0_25px_#34d399]' : 'bg-red-500 shadow-[0_0_25px_#ef4444]'}`} />

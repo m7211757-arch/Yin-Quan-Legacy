@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入 Tailwind CSS 輕功 -->
+    <!-- 引入江湖套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Babel 翻譯官：確保瀏覽器能讀懂 JSX 語法 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 引入 Noto Serif TC 字體 (古風雅韻) -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
-    <!-- Import Map 解決模組路徑解析問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -30,10 +27,8 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b0000; }
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
-        .sub-spacing { letter-spacing: 1.2em; text-indent: 1.2em; }
-
+        .sub-spacing { letter-spacing: 1.5em; text-indent: 1.5em; }
         @media (max-width: 640px) { 
             .title-spacing { letter-spacing: 0.2em !important; text-indent: 0.2em !important; } 
             .sub-spacing { letter-spacing: 0.3em !important; text-indent: 0.3em !important; }
@@ -50,20 +45,17 @@
         import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         
-        // 使用 ?external=react 解決 React 實體衝突導致的 Error #31
         import { 
             Plus, Edit2, Trash2, X, Ghost, Upload, 
             BookOpen, Feather, Shield, Crosshair, History, Compass, AlertTriangle 
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心配置】：自動偵測環境靈力
+        // 【核心靈脈配置】：嚴格優先使用環境變量
         // ==========================================
-        const getFirebaseConfig = () => {
-            if (typeof __firebase_config !== 'undefined') {
-                return JSON.parse(__firebase_config);
-            }
-            return {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
                 projectId: "yin-quan-legacy",
@@ -72,11 +64,8 @@
                 appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
                 measurementId: "G-S5X670YKCT"
             };
-        };
-
-        const firebaseConfig = getFirebaseConfig();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
         
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -100,32 +89,32 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 認證流程：確保 Auth 在所有查詢之前
+            // 遵守規則三：Auth Before Queries
             useEffect(() => {
                 const initAuth = async () => {
-                    console.log("正在呼喚靈脈...");
+                    console.log("【靈脈】喚醒中...");
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
                             await signInAnonymously(auth);
                         }
-                    } catch (err) {
-                        console.error("靈脈連動失敗", err);
-                        // 不要在這裡 alert，讓 handleSubmit 去處理報錯
+                    } catch (e) {
+                        console.error("【靈脈】覺醒受阻:", e);
+                        setLoading(false);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     if (u) {
-                        console.log("俠客已入座:", u.uid);
+                        console.log("【靈脈】身分確認:", u.uid);
                         setUser(u);
                     }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據監聽：使用公共路徑
+            // 數據同步：統一使用 public 路徑
             useEffect(() => {
                 if (!user) return;
                 
@@ -143,7 +132,7 @@
                     });
                     setExpandedBatches(prev => ({ ...expandMap, ...prev }));
                 }, (err) => {
-                    console.error("史冊讀取失敗:", err);
+                    console.error("【史冊】翻閱失敗:", err);
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -174,16 +163,14 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                console.log("【觸發】提交按鈕按下...");
+                console.log("【落筆】嘗試書寫...");
 
                 if (!user) {
-                    console.error("提交失敗：身分驗證未通過");
-                    alert("靈脈未通！請先確認 Firebase 後台 Authentication 已開啟「匿名登入 (Anonymous)」登入方法。");
+                    alert("靈脈未通！請先確認 Firebase 後台已開啟「匿名登入」。");
                     return;
                 }
                 
                 if (isSaving) return;
-                
                 setIsSaving(true);
                 const { id, ...dataToSave } = formData;
                 
@@ -192,21 +179,13 @@
                     if (editingId) {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
                         await updateDoc(docRef, dataToSave);
-                        console.log("重修史冊成功");
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
-                        console.log("錄入英雄成功");
                     }
                     resetForm();
                 } catch (err) {
-                    console.error("落筆失敗:", err);
-                    let msg = "落筆失敗！\n";
-                    if (err.code === 'permission-denied') {
-                        msg += "原因：權限不足。請檢查 Firebase Firestore Rules 是否已發布為 allow read, write: if true;";
-                    } else {
-                        msg += "錯誤代碼: " + err.code + "\n訊息: " + err.message;
-                    }
-                    alert(msg);
+                    console.error("【落筆】失敗:", err);
+                    alert("落筆失敗！錯誤代碼: " + err.code);
                 } finally {
                     setIsSaving(false);
                 }
@@ -218,7 +197,7 @@
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
-                } catch (e) { alert("抹除失敗，請檢查權限設定。"); }
+                } catch (e) { alert("抹除失敗"); }
             };
 
             const resetForm = () => {
@@ -253,17 +232,13 @@
                                 <BookOpen size={44} className="text-amber-500 relative z-10 animate-pulse" />
                             </div>
                         </div>
-                        
-                        <div className="w-full flex justify-center items-center mb-12 px-4">
-                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)] text-center pl-[0.5em]">
-                                隱泉水榭·幫會傳承錄
-                            </h1>
-                        </div>
-                        
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)] text-center pl-[0.5em] mb-12">
+                            隱泉水榭·幫會傳承錄
+                        </h1>
                         <div className="flex flex-col items-center gap-12 w-full px-4 text-center">
                             <div className="flex items-center justify-center gap-4 md:gap-12 whitespace-nowrap w-full">
                                 <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-amber-900" />
-                                <p className="text-amber-700 font-bold text-xs md:text-lg uppercase italic sub-spacing pl-[1.2em]">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
+                                <p className="text-amber-700 font-bold tracking-[1.5em] text-xs md:text-lg uppercase italic sub-spacing pl-[1.5em]">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
                                 <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-amber-900" />
                             </div>
                             <div className="max-w-2xl bg-amber-950/10 border-x border-amber-900/20 p-8 backdrop-blur-sm mx-auto">
@@ -280,7 +255,7 @@
                                         <div className="relative cursor-pointer group" onClick={() => setExpandedBatches(p => ({ ...p, [batch]: !p[batch] }))}>
                                             <div className="bg-[#6b0000] text-[#fef3c7] w-32 h-32 flex items-center justify-center rounded-sm shadow-2xl border-[6px] border-double border-[#4a0000] transform transition-all group-hover:scale-110">
                                                 <div className="text-center font-black">
-                                                    <div className="text-[10px] opacity-60 tracking-[0.2em] mb-1 uppercase">江湖世代</div>
+                                                    <div className="text-[10px] opacity-60 tracking-[0.2em] mb-1 uppercase font-bold">江湖世代</div>
                                                     <div className="text-4xl">第{batch}批</div>
                                                     <div className="text-xs opacity-80 mt-1 font-serif tracking-[0.4em]">傳承錄</div>
                                                 </div>
@@ -319,13 +294,11 @@
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        <button onClick={() => setConfirmDeleteId(member.id)} className={`p-3 rounded transition-all ${confirmDeleteId === member.id ? 'bg-red-800 text-white' : 'bg-amber-950/20 hover:bg-red-800 hover:text-white'}`}><Trash2 size={20}/></button>
+                                                                        <button onClick={() => setConfirmDeleteId(member.id)} className={`p-3 rounded transition-all ${confirmDeleteId === member.id ? 'bg-red-800 text-white' : 'bg-amber-950/20 hover:bg-red-800'}`}><Trash2 size={20}/></button>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="relative mb-12 pl-6">
-                                                                <p className="text-amber-100/70 text-xl md:text-2xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
-                                                            </div>
+                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
                                                             <div className="text-[12px] text-amber-900/60 font-black uppercase tracking-[0.5em] pt-8 border-t border-amber-900/10 flex items-center gap-2"><History size={16} /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
                                                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-amber-900/30 rounded-full blur-[1px]" />
@@ -356,16 +329,16 @@
                                 </div>
                                 <form onSubmit={handleSubmit} className="space-y-12">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">所 屬 流 派</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">所 屬 流 派</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black block text-center sm:text-left">江 湖 畫 像 (本地畫像)</label><div className="flex flex-col md:flex-row gap-6 p-4 border border-amber-900/10"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-900/10 p-2 text-sm italic text-amber-100" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-8 py-3 border-2 border-amber-900/40 text-xs font-black uppercase hover:bg-amber-900/20 transition-all text-amber-600 font-bold">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
+                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black block text-center sm:text-left font-bold">江 湖 畫 像 (本地畫像)</label><div className="flex flex-col md:flex-row gap-6 p-4 border border-amber-900/10"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-900/10 p-2 text-sm italic text-amber-100" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-8 py-3 border-2 border-amber-900/40 text-xs font-black uppercase hover:bg-amber-900/20 transition-all text-amber-600 font-bold">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">曾 任 職 位</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">曾 任 職 位</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
+                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
                                     
                                     <button 
                                         type="submit" 
@@ -381,16 +354,17 @@
 
                     <footer className="max-w-4xl mx-auto mt-60 px-6 pb-32 opacity-20 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-900 to-transparent mb-12" />
-                        <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.2em]">江 湖 路 遠 · 終 會 在 遇</p>
-                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full pl-[0.5em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                        <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.5em]">江 湖 路 遠 · 終 會 在 遇</p>
+                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full block">自古英雄如美人 · 不許人間見白頭</p>
+                        <div className="mt-8 p-4 border border-amber-900/20 text-amber-900/40 text-[8px] tracking-[0.5em] uppercase bg-amber-900/5">
+                            俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}
+                        </div>
                     </footer>
                 </div>
             );
         }
-        
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>

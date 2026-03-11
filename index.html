@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入江湖必備套件 -->
+    <!-- 引入江湖套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
@@ -51,15 +51,11 @@
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心配置】：自適應環境靈力
+        // 【靈脈核心】初始化
         // ==========================================
-        const getFinalConfig = () => {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                try {
-                    return typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-                } catch (e) { console.error("環境靈力解析失敗"); }
-            }
-            return {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCc1LE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
                 projectId: "yin-quan-legacy",
@@ -68,11 +64,8 @@
                 appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
                 measurementId: "G-S5X670YKCT"
             };
-        };
-
-        const firebaseConfig = getFinalConfig();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
         
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -96,57 +89,57 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 遵守規則三：Auth Before Queries 並使用 await
+            // 遵守規則三：先執行 Auth 並等待
             useEffect(() => {
                 const initAuth = async () => {
                     try {
-                        console.log("【靈脈】喚醒中，當前 appId:", appId);
+                        console.log("【靈脈】準備身分驗證...");
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
-                        } else if (!auth.currentUser) {
+                        } else {
                             await signInAnonymously(auth);
                         }
                     } catch (err) {
                         console.error("【靈脈】認證失敗:", err);
+                        setLoading(false);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     if (u) {
-                        console.log("【靈脈】身分確立:", u.uid);
+                        console.log("【靈脈】俠客身分確立:", u.uid);
                         setUser(u);
                     }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據同步：確保在 User 確立後才進行
+            // 數據同步：確保在 user 確立後才執行，遵守規則一
             useEffect(() => {
                 if (!user) return;
                 
-                // 嚴格遵守路徑規則：/artifacts/{appId}/public/data/members
-                const collectionPath = ['artifacts', appId, 'public', 'data', 'members'];
-                console.log("【史冊】讀取路徑:", collectionPath.join('/'));
-                
-                const colRef = collection(db, ...collectionPath);
-                
-                const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const list = [];
-                    snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
-                    list.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
-                    setMembers(list);
-                    setLoading(false);
-                    
-                    const expandMap = {};
-                    list.forEach(m => { if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true; });
-                    setExpandedBatches(prev => ({ ...expandMap, ...prev }));
-                }, (err) => {
-                    console.error("【數據】讀取失敗", err);
-                    // 即使失敗也關閉 loading 並顯示錯誤 UI
-                    setLoading(false);
-                });
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                console.log("【史冊】開啟監聽，路徑: artifacts/" + appId + "/public/data/members");
+
+                const unsubscribe = onSnapshot(colRef, 
+                    (snapshot) => {
+                        const list = [];
+                        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+                        list.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
+                        setMembers(list);
+                        setLoading(false);
+                        const expandMap = {};
+                        list.forEach(m => { if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true; });
+                        setExpandedBatches(prev => ({ ...expandMap, ...prev }));
+                    }, 
+                    (err) => {
+                        console.error("【數據】讀取被攔截，權限不足:", err);
+                        // 如果出現此錯誤，通常需要確認 Rules 是否已 Publish 且 appId 正確
+                        setLoading(false);
+                    }
+                );
                 return () => unsubscribe();
-            }, [user, appId]);
+            }, [user]);
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -173,10 +166,9 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                console.log("【落筆】提交流程啟動...");
-
                 if (isSaving) return;
                 
+                // 即時重新確認身分，確保落筆時身分有效
                 let activeUser = auth.currentUser;
                 if (!activeUser) {
                     try {
@@ -184,7 +176,7 @@
                         activeUser = result.user;
                         setUser(activeUser);
                     } catch (err) {
-                        alert("靈脈未通！請確認 Firebase 的「授權網域」與「匿名登入」已開啟。");
+                        alert("靈脈未通！請確認 Firebase 認證已開啟。");
                         return;
                     }
                 }
@@ -199,11 +191,9 @@
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
                     }
-                    console.log("【落筆】成功");
                     resetForm();
                 } catch (err) {
-                    console.error("【落筆】失敗:", err);
-                    alert("落筆失敗！請確認 Firebase Rules 是否包含 allow read, write: if true; 且路徑正確。\n代碼: " + err.code);
+                    alert("落筆失敗！請檢查資料庫規則(Rules)是否正確發布。");
                 } finally { setIsSaving(false); }
             };
 
@@ -266,8 +256,8 @@
                     <main className="max-w-5xl mx-auto px-6 -mt-32 relative z-30 pb-48 text-center">
                         <div className="space-y-40 inline-block w-full">
                             {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
-                                <section key={batch} className="relative pt-48 w-full text-center">
-                                    <div className="flex justify-center mb-24 sticky top-80 z-[40]">
+                                <section key={batch} className="relative pt-24 w-full text-center">
+                                    <div className="flex justify-center mb-24 relative z-[40]">
                                         <div className="relative cursor-pointer group" onClick={() => setExpandedBatches(p => ({ ...p, [batch]: !p[batch] }))}>
                                             <div className="bg-[#6b0000] text-[#fef3c7] w-32 h-32 flex items-center justify-center rounded-sm shadow-2xl border-[6px] border-double border-[#4a0000] transform transition-all group-hover:scale-110">
                                                 <div className="text-center font-black">
@@ -321,7 +311,7 @@
                                                     </div>
                                                     <div className="w-full md:w-[30%] mt-12 md:mt-20">
                                                         <div className="aspect-[3/4] bg-black border-[16px] border-[#1a1612] shadow-2xl relative overflow-hidden rounded-sm group/img">
-                                                            {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-30 grayscale group-hover/img:grayscale-0 group-hover/img:opacity-100 transition-all duration-1000 scale-110 group-hover/img:scale-100" alt={member.name} /> : <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><Ghost size={100} /><span className="text-sm tracking-[1em] mt-4 text-center">影跡全無</span></div>}
+                                                            {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-30 grayscale group-hover/img:grayscale-0 group-hover/img:opacity-100 transition-all duration-1000 scale-110 group-hover/img:scale-100" alt={member.name} /> : <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><Ghost size={100} /><span className="text-sm tracking-[1em] mt-4 text-center px-4 uppercase font-bold">影跡全無</span></div>}
                                                             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-90" />
                                                         </div>
                                                     </div>

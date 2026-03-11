@@ -9,6 +9,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
+    <!-- Import Map 解決模組路徑問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -51,11 +52,17 @@
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心靈脈配置】：嚴格優先使用環境變量
+        // 【核心配置】：自動偵測環境靈力 (Canvas vs Vercel)
         // ==========================================
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
+        const getFinalConfig = () => {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                try {
+                    return typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+                } catch (e) {
+                    console.error("環境靈力解析失敗，嘗試備援配置");
+                }
+            }
+            return {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
                 projectId: "yin-quan-legacy",
@@ -64,8 +71,11 @@
                 appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
                 measurementId: "G-S5X670YKCT"
             };
-        
+        };
+
+        const firebaseConfig = getFinalConfig();
         const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
+        
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -92,29 +102,29 @@
             // 遵守規則三：Auth Before Queries
             useEffect(() => {
                 const initAuth = async () => {
-                    console.log("【靈脈】喚醒中...");
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
                             await signInAnonymously(auth);
                         }
-                    } catch (e) {
-                        console.error("【靈脈】覺醒受阻:", e);
+                    } catch (err) {
+                        console.error("【靈脈】喚醒失敗:", err);
+                        // 嘗試在報錯時依然關閉 Loading 以顯示 UI
                         setLoading(false);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     if (u) {
-                        console.log("【靈脈】身分確認:", u.uid);
+                        console.log("【靈脈】俠客身分已覺醒");
                         setUser(u);
                     }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據同步：統一使用 public 路徑
+            // 數據同步：嚴格遵守路徑規則一
             useEffect(() => {
                 if (!user) return;
                 
@@ -132,11 +142,11 @@
                     });
                     setExpandedBatches(prev => ({ ...expandMap, ...prev }));
                 }, (err) => {
-                    console.error("【史冊】翻閱失敗:", err);
+                    console.error("【史冊】讀取受阻:", err);
                     setLoading(false);
                 });
                 return () => unsubscribe();
-            }, [user]);
+            }, [user, appId]);
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -165,11 +175,20 @@
                 e.preventDefault();
                 console.log("【落筆】嘗試書寫...");
 
-                if (!user) {
-                    alert("靈脈未通！請先確認 Firebase 後台已開啟「匿名登入」。");
-                    return;
-                }
+                let activeUser = auth.currentUser;
                 
+                // 如果當前狀態遺失，嘗試即時重連
+                if (!activeUser) {
+                    try {
+                        const result = await signInAnonymously(auth);
+                        activeUser = result.user;
+                        setUser(activeUser);
+                    } catch (err) {
+                        alert("靈脈暫時斷流，請稍後再試。");
+                        return;
+                    }
+                }
+
                 if (isSaving) return;
                 setIsSaving(true);
                 const { id, ...dataToSave } = formData;
@@ -182,17 +201,18 @@
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
                     }
+                    console.log("【落筆】圓滿成功");
                     resetForm();
                 } catch (err) {
                     console.error("【落筆】失敗:", err);
-                    alert("落筆失敗！錯誤代碼: " + err.code);
+                    alert("落筆失敗！請檢查 Firebase Rules。代碼: " + err.code);
                 } finally {
                     setIsSaving(false);
                 }
             };
 
             const executeDelete = async (id) => {
-                if (!user) return;
+                if (!auth.currentUser) return;
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
                     await deleteDoc(docRef);
@@ -298,7 +318,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
+                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl md:text-2xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
                                                             <div className="text-[12px] text-amber-900/60 font-black uppercase tracking-[0.5em] pt-8 border-t border-amber-900/10 flex items-center gap-2"><History size={16} /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
                                                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-amber-900/30 rounded-full blur-[1px]" />
@@ -357,14 +377,18 @@
                         <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.5em]">江 湖 路 遠 · 終 會 在 遇</p>
                         <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full block">自古英雄如美人 · 不許人間見白頭</p>
-                        <div className="mt-8 p-4 border border-amber-900/20 text-amber-900/40 text-[8px] tracking-[0.5em] uppercase bg-amber-900/5">
-                            俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}
+                        <div className="mt-8 flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${user ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+                            <div className="p-4 border border-amber-900/20 text-amber-900/40 text-[8px] tracking-[0.5em] uppercase bg-amber-900/5">
+                                俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}
+                            </div>
                         </div>
                     </footer>
                 </div>
             );
         }
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入江湖套件 -->
+    <!-- 引入江湖必備套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
-    <!-- Import Map 解決模組路徑問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -52,18 +51,16 @@
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心配置】：自動偵測環境靈力 (Canvas vs Vercel)
+        // 【核心配置】：自適應環境靈力
         // ==========================================
         const getFinalConfig = () => {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 try {
                     return typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-                } catch (e) {
-                    console.error("環境靈力解析失敗，嘗試備援配置");
-                }
+                } catch (e) { console.error("環境靈力解析失敗"); }
             }
             return {
-                apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
+                apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCc1LE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
                 projectId: "yin-quan-legacy",
                 storageBucket: "yin-quan-legacy.firebasestorage.app",
@@ -99,36 +96,40 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 遵守規則三：Auth Before Queries
+            // 遵守規則三：Auth Before Queries 並使用 await
             useEffect(() => {
                 const initAuth = async () => {
                     try {
+                        console.log("【靈脈】喚醒中，當前 appId:", appId);
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
+                        } else if (!auth.currentUser) {
                             await signInAnonymously(auth);
                         }
                     } catch (err) {
-                        console.error("【靈脈】喚醒失敗:", err);
-                        // 嘗試在報錯時依然關閉 Loading 以顯示 UI
-                        setLoading(false);
+                        console.error("【靈脈】認證失敗:", err);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     if (u) {
-                        console.log("【靈脈】俠客身分已覺醒");
+                        console.log("【靈脈】身分確立:", u.uid);
                         setUser(u);
                     }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據同步：嚴格遵守路徑規則一
+            // 數據同步：確保在 User 確立後才進行
             useEffect(() => {
                 if (!user) return;
                 
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                // 嚴格遵守路徑規則：/artifacts/{appId}/public/data/members
+                const collectionPath = ['artifacts', appId, 'public', 'data', 'members'];
+                console.log("【史冊】讀取路徑:", collectionPath.join('/'));
+                
+                const colRef = collection(db, ...collectionPath);
+                
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
                     const list = [];
                     snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
@@ -137,12 +138,11 @@
                     setLoading(false);
                     
                     const expandMap = {};
-                    list.forEach(m => { 
-                        if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true;
-                    });
+                    list.forEach(m => { if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true; });
                     setExpandedBatches(prev => ({ ...expandMap, ...prev }));
                 }, (err) => {
-                    console.error("【史冊】讀取受阻:", err);
+                    console.error("【數據】讀取失敗", err);
+                    // 即使失敗也關閉 loading 並顯示錯誤 UI
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -173,26 +173,24 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                console.log("【落筆】嘗試書寫...");
+                console.log("【落筆】提交流程啟動...");
 
-                let activeUser = auth.currentUser;
+                if (isSaving) return;
                 
-                // 如果當前狀態遺失，嘗試即時重連
+                let activeUser = auth.currentUser;
                 if (!activeUser) {
                     try {
                         const result = await signInAnonymously(auth);
                         activeUser = result.user;
                         setUser(activeUser);
                     } catch (err) {
-                        alert("靈脈暫時斷流，請稍後再試。");
+                        alert("靈脈未通！請確認 Firebase 的「授權網域」與「匿名登入」已開啟。");
                         return;
                     }
                 }
 
-                if (isSaving) return;
                 setIsSaving(true);
                 const { id, ...dataToSave } = formData;
-                
                 try {
                     const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                     if (editingId) {
@@ -201,14 +199,12 @@
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
                     }
-                    console.log("【落筆】圓滿成功");
+                    console.log("【落筆】成功");
                     resetForm();
                 } catch (err) {
                     console.error("【落筆】失敗:", err);
-                    alert("落筆失敗！請檢查 Firebase Rules。代碼: " + err.code);
-                } finally {
-                    setIsSaving(false);
-                }
+                    alert("落筆失敗！請確認 Firebase Rules 是否包含 allow read, write: if true; 且路徑正確。\n代碼: " + err.code);
+                } finally { setIsSaving(false); }
             };
 
             const executeDelete = async (id) => {
@@ -318,7 +314,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl md:text-2xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
+                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
                                                             <div className="text-[12px] text-amber-900/60 font-black uppercase tracking-[0.5em] pt-8 border-t border-amber-900/10 flex items-center gap-2"><History size={16} /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
                                                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-amber-900/30 rounded-full blur-[1px]" />
@@ -359,7 +355,6 @@
                                     </div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black font-bold">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-                                    
                                     <button 
                                         type="submit" 
                                         disabled={isSaving}
@@ -375,7 +370,7 @@
                     <footer className="max-w-4xl mx-auto mt-60 px-6 pb-32 opacity-20 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-900 to-transparent mb-12" />
                         <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.5em]">江 湖 路 遠 · 終 會 在 遇</p>
-                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full pl-[0.5em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full block">自古英雄如美人 · 不許人間見白頭</p>
                         <div className="mt-8 flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${user ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />

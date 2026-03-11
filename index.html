@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入 Tailwind CSS -->
+    <!-- 引入 Tailwind CSS 輕功 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Babel 編譯器 -->
+    <!-- 引入 Babel 翻譯官：確保瀏覽器能讀懂 JSX 語法 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 引入古風字體 -->
+    <!-- 引入 Noto Serif TC 字體 (古風雅韻) -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
     <!-- Import Map 解決模組路徑解析問題 -->
@@ -100,9 +100,10 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 遵守規則三：先驗證再查詢
+            // 確保認證流程穩定
             useEffect(() => {
                 const initAuth = async () => {
+                    console.log("正在呼喚靈脈...");
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
@@ -111,18 +112,21 @@
                         }
                     } catch (err) {
                         console.error("靈脈連動失敗", err);
+                        alert("靈脈覺醒失敗！請檢查 Firebase 控制台中 Authentication 是否開啟了「匿名登入」。");
                         setLoading(false);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    console.log("目前俠客狀態:", u ? "已連線 (" + u.uid + ")" : "斷開連線");
-                    setUser(u);
+                    if (u) {
+                        console.log("俠客已入座:", u.uid);
+                        setUser(u);
+                    }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據同步：統一公共靈脈路徑
+            // 數據監控
             useEffect(() => {
                 if (!user) return;
                 
@@ -140,7 +144,7 @@
                     });
                     setExpandedBatches(prev => ({ ...expandMap, ...prev }));
                 }, (err) => {
-                    console.error("史冊翻閱失敗:", err);
+                    console.error("史冊讀取失敗:", err);
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -171,32 +175,38 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                console.log("【落筆中】發起提交指令...");
+
                 if (!user) {
-                    alert("靈脈未通（未登入），請重新整理網頁。");
+                    console.error("提交攔截：無有效身分");
+                    alert("靈脈未通！請先確認 Firebase 後台已開啟「匿名登入 (Anonymous)」登入方法。");
                     return;
                 }
+                
                 if (isSaving) return;
                 
                 setIsSaving(true);
-                // 剔除 ID 欄位，避免 Firestore 寫入衝突
+                // 剔除 ID 避免寫入衝突
                 const { id, ...dataToSave } = formData;
                 
                 try {
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                     if (editingId) {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
                         await updateDoc(docRef, dataToSave);
+                        console.log("【重修成功】");
                     } else {
-                        const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
+                        console.log("【錄入成功】");
                     }
                     resetForm();
                 } catch (err) {
-                    console.error("落筆失敗詳細資訊:", err);
+                    console.error("落筆失敗:", err);
                     let msg = "落筆失敗！\n";
                     if (err.code === 'permission-denied') {
-                        msg += "【診斷】：權限不足。請務必確認 Firebase 控制台中的 Firestore Rules 已發布為 allow read, write: if true;";
+                        msg += "原因：權限不足。請檢查 Firebase Firestore 的 Rules 規則是否已發布為 allow read, write: if true;";
                     } else {
-                        msg += "【代碼】: " + err.code + "\n【資訊】: " + err.message;
+                        msg += "代碼：" + err.code + "\n訊息：" + err.message;
                     }
                     alert(msg);
                 } finally {
@@ -210,9 +220,7 @@
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
-                } catch (e) { 
-                    alert("抹除失敗，請確認權限設定。"); 
-                }
+                } catch (e) { alert("抹除失敗，請檢查權限設定。"); }
             };
 
             const resetForm = () => {
@@ -233,7 +241,7 @@
             if (loading) return (
                 <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-200/50">
                     <Feather size={64} className="animate-pulse text-amber-600" />
-                    <p className="tracking-[0.8em] mt-8 text-sm opacity-50 text-center px-4 font-bold">隱泉水榭 錄盡英雄</p>
+                    <p className="tracking-[0.8em] mt-8 text-sm opacity-50 text-center px-4 font-bold uppercase">隱泉水榭 錄盡英雄</p>
                 </div>
             );
 
@@ -269,7 +277,7 @@
                     <main className="max-w-5xl mx-auto px-6 -mt-32 relative z-30 pb-48 text-center">
                         <div className="space-y-40 inline-block w-full">
                             {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
-                                <section key={batch} className="relative pt-48 w-full">
+                                <section key={batch} className="relative pt-48 w-full text-center">
                                     <div className="flex justify-center mb-24 sticky top-80 z-[40]">
                                         <div className="relative cursor-pointer group" onClick={() => setExpandedBatches(p => ({ ...p, [batch]: !p[batch] }))}>
                                             <div className="bg-[#6b0000] text-[#fef3c7] w-32 h-32 flex items-center justify-center rounded-sm shadow-2xl border-[6px] border-double border-[#4a0000] transform transition-all group-hover:scale-110">
@@ -302,7 +310,7 @@
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex gap-4">
-                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-950/20 hover:bg-amber-600 rounded transition-all"><Edit2 size={20}/></button>
+                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-950/20 hover:bg-amber-600 rounded transition-all shadow-inner"><Edit2 size={20}/></button>
                                                                     <div className="relative">
                                                                         {confirmDeleteId === member.id && (
                                                                             <div className="absolute bottom-full right-0 mb-2 flex flex-col items-end gap-2 animate-in slide-in-from-bottom-2 duration-200">
@@ -348,6 +356,7 @@
                                     <h2 className="text-3xl md:text-5xl font-black tracking-[1em] text-amber-600 uppercase flex items-center gap-6"><Compass size={40} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
                                     <button onClick={resetForm} className="text-amber-900 hover:text-amber-500 transition-all hover:rotate-90 duration-300"><X size={48} /></button>
                                 </div>
+                                {/* 這裡確保 form 有連結到 handleSubmit */}
                                 <form onSubmit={handleSubmit} className="space-y-12">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
@@ -360,6 +369,8 @@
                                     </div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+                                    
+                                    {/* 這裡確保 button 是 type="submit" */}
                                     <button 
                                         type="submit" 
                                         disabled={isSaving}

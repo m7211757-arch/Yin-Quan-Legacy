@@ -61,9 +61,15 @@
         // ==========================================
         // 【軍師配置】：已自動偵測環境靈力
         // ==========================================
-        const getFirebaseConfig = () => {
-            if (typeof __firebase_config !== 'undefined') {
-                return JSON.parse(__firebase_config);
+        const firebaseConfig = {
+    apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
+    authDomain: "yin-quan-legacy.firebaseapp.com",
+    projectId: "yin-quan-legacy",
+    storageBucket: "yin-quan-legacy.firebasestorage.app",
+    messagingSenderId: "458932829125",
+    appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
+    measurementId: "G-S5X670YKCT"
+};
             }
             return {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
@@ -396,3 +402,4 @@
     </script>
 </body>
 </html>
+

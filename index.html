@@ -4,10 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
+    <!-- 引入 Tailwind CSS 輕功 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Babel 翻譯官：確保瀏覽器能讀懂 JSX 語法 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 Noto Serif TC 字體 (古風雅韻) -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
+    <!-- Import Map 解決模組路徑解析問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -27,6 +31,7 @@
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
+        /* 標題字距與呼吸感 - 軍師專屬比例 */
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
         .sub-spacing { letter-spacing: 1.2em; text-indent: 1.2em; }
 
@@ -39,26 +44,27 @@
 <body class="custom-scrollbar overflow-x-hidden">
     <div id="root"></div>
 
+    <!-- 設置為 text/babel 並啟用 data-type="module" -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo, useRef } from 'react';
         import ReactDOM from 'react-dom/client';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
         import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
+        
+        // 使用 ?external=react 確保與主程式共用同一個 React 實體，修復 Error #31
         import { 
             Plus, Edit2, Trash2, X, Ghost, Upload, PenTool, 
             BookOpen, Feather, Flame, Shield, Crosshair, History, Compass, AlertTriangle 
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心修正】：自動偵測環境靈力，修復 API Key 報錯
+        // 【靈力配置】：自動偵測環境配置
         // ==========================================
         const getFirebaseConfig = () => {
-            // 優先使用預覽環境提供的配置
             if (typeof __firebase_config !== 'undefined') {
                 return JSON.parse(__firebase_config);
             }
-            // 部署至 Vercel 後將使用下方軍師的真實配置
             return {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
@@ -85,6 +91,7 @@
             const [user, setUser] = useState(null);
             const [members, setMembers] = useState([]);
             const [isAdding, setIsAdding] = useState(false);
+            const [isSaving, setIsSaving] = useState(false); // 新增：提交狀態
             const [editingId, setEditingId] = useState(null);
             const [loading, setLoading] = useState(true);
             const [expandedBatches, setExpandedBatches] = useState({});
@@ -107,7 +114,6 @@
                         }
                     } catch (err) {
                         console.error("江湖阻斷:", err);
-                        // 如果環境不支持，至少關閉 Loading
                         setLoading(false);
                     }
                 };
@@ -119,14 +125,12 @@
             // 遵守規則一與二：Firestore 同步
             useEffect(() => {
                 if (!user) return;
-                // 使用公共路徑
                 const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
                     const memberList = [];
                     snapshot.forEach((doc) => {
                         memberList.push({ id: doc.id, ...doc.data() });
                     });
-                    // 記憶中排序
                     memberList.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
                     setMembers(memberList);
                     setLoading(false);
@@ -166,7 +170,11 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!user) return;
+                if (!user || isSaving) return;
+                
+                setIsSaving(true);
+                console.log("開始落筆...");
+                
                 const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 try {
                     if (editingId) {
@@ -175,9 +183,13 @@
                     } else {
                         await addDoc(collectionRef, { ...formData, createdAt: new Date().toISOString() });
                     }
+                    console.log("墨跡已乾，書寫成功！");
                     resetForm();
                 } catch (error) { 
-                    console.error("書寫失敗:", error); 
+                    console.error("書寫失敗:", error);
+                    alert("落筆失敗！請檢查您的 Firebase Firestore Rules (規則) 是否已開啟寫入權限。\n\n錯誤資訊: " + error.message);
+                } finally {
+                    setIsSaving(false);
                 }
             };
 
@@ -187,7 +199,10 @@
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
-                } catch (error) { console.error(error); }
+                } catch (error) { 
+                    console.error(error); 
+                    alert("抹除失敗，請檢查權限設定。");
+                }
             };
 
             const resetForm = () => {
@@ -282,7 +297,7 @@
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex gap-4">
-                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-950/20 hover:bg-amber-600 rounded transition-all"><Edit2 size={20}/></button>
+                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-950/20 hover:bg-amber-600 rounded transition-all shadow-inner"><Edit2 size={20}/></button>
                                                                     <div className="relative">
                                                                         {confirmDeleteId === member.id && (
                                                                             <div className="absolute bottom-full right-0 mb-2 flex flex-col items-end gap-2 animate-in slide-in-from-bottom-2 duration-200">
@@ -297,10 +312,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="relative mb-12 pl-6">
-                                                                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-600/50 via-transparent to-amber-600/50" />
-                                                                <p className="text-amber-100/70 text-xl md:text-2xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
-                                                            </div>
+                                                            <div className="relative mb-12 pl-6"><p className="text-amber-100/70 text-xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p></div>
                                                             <div className="text-[12px] text-amber-900/60 font-black uppercase tracking-[0.5em] pt-8 border-t border-amber-900/10 flex items-center gap-2"><History size={16} /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
                                                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-amber-900/30 rounded-full blur-[1px]" />
@@ -348,7 +360,13 @@
                                     </div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-                                    <button type="submit" className="w-full py-8 bg-[#6b0000] text-[#fef3c7] font-black tracking-[2em] border-4 border-double border-[#4a0000] shadow-2xl hover:bg-[#4a0000] transition-all transform hover:-translate-y-2 text-3xl uppercase text-center">落 筆 成 書</button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSaving}
+                                        className={`w-full py-8 bg-[#6b0000] text-[#fef3c7] font-black tracking-[2em] border-4 border-double border-[#4a0000] shadow-2xl transition-all transform text-3xl uppercase text-center ${isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#4a0000] hover:-translate-y-2'}`}
+                                    >
+                                        {isSaving ? '凝 氣 成 書...' : '落 筆 成 書'}
+                                    </button>
                                 </form>
                             </div>
                         </div>
@@ -364,7 +382,8 @@
             );
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

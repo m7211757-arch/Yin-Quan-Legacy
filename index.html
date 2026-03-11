@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入 Tailwind CSS 輕功 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Babel 翻譯官：編譯 JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 引入 Noto Serif TC 字體 (古風雅韻) -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
-    <!-- Import Map 解決模組路徑解析問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -31,9 +27,8 @@
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        /* 標題字距與呼吸感 - 軍師專屬比例 */
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
-        .sub-spacing { letter-spacing: 1.5em; text-indent: 1.5em; }
+        .sub-spacing { letter-spacing: 1.2em; text-indent: 1.2em; }
 
         @media (max-width: 640px) { 
             .title-spacing { letter-spacing: 0.2em !important; text-indent: 0.2em !important; } 
@@ -44,46 +39,45 @@
 <body class="custom-scrollbar overflow-x-hidden">
     <div id="root"></div>
 
-    <!-- 設置為 text/babel 並啟用 data-type="module" -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo, useRef } from 'react';
         import ReactDOM from 'react-dom/client';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
         import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
-        
-        // 使用 ?external=react 確保與主程式共用同一個 React 實體，修復 Error #31
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         import { 
             Plus, Edit2, Trash2, X, Ghost, Upload, PenTool, 
             BookOpen, Feather, Flame, Shield, Crosshair, History, Compass, AlertTriangle 
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【核心修正】：自動偵測環境配置，修復 API Key 錯誤
+        // 【核心修正】：自動偵測環境靈力，修復 API Key 報錯
         // ==========================================
-        let firebaseConfig;
-        try {
-            // 如果在當前環境執行，使用系統提供的變數
-            firebaseConfig = typeof __firebase_config !== 'undefined' 
-                ? JSON.parse(__firebase_config) 
-                : {
-                    apiKey: "YOUR_API_KEY", // 下載至 Vercel 時請替換此處
-                    authDomain: "YOUR_AUTH_DOMAIN",
-                    projectId: "YOUR_PROJECT_ID",
-                    storageBucket: "YOUR_STORAGE_BUCKET",
-                    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                    appId: "YOUR_APP_ID"
-                };
-        } catch (e) {
-            console.error("配置讀取失敗");
-        }
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-shui-xie"; 
+        const getFirebaseConfig = () => {
+            // 優先使用預覽環境提供的配置
+            if (typeof __firebase_config !== 'undefined') {
+                return JSON.parse(__firebase_config);
+            }
+            // 部署至 Vercel 後將使用下方軍師的真實配置
+            return {
+                apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
+                authDomain: "yin-quan-legacy.firebaseapp.com",
+                projectId: "yin-quan-legacy",
+                storageBucket: "yin-quan-legacy.firebasestorage.app",
+                messagingSenderId: "458932829125",
+                appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
+                measurementId: "G-S5X670YKCT"
+            };
+        };
 
+        const firebaseConfig = getFirebaseConfig();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-shui-xie"; 
+        
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // 軍師排定的職位
         const CLASSES = ['碎夢', '龍吟', '血河', '神相', '九靈', '素問', '鐵衣', '玄機', '荒羽', '鴻音', '潮光'];
         const POSITIONS = ['幫眾', '堂主', '副堂主', '宴者', '雅匠', '文士', '接待', '軍師', '當家'];
 
@@ -102,25 +96,37 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
+            // 遵守規則三：Auth Before Queries
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    if (!currentUser) {
-                        signInAnonymously(auth).catch(err => console.error("江湖阻斷:", err));
-                    } else {
-                        setUser(currentUser);
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (err) {
+                        console.error("江湖阻斷:", err);
+                        // 如果環境不支持，至少關閉 Loading
+                        setLoading(false);
                     }
-                });
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
                 return () => unsubscribe();
             }, []);
 
+            // 遵守規則一與二：Firestore 同步
             useEffect(() => {
                 if (!user) return;
-                const collectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'members');
+                // 使用公共路徑
+                const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
                     const memberList = [];
                     snapshot.forEach((doc) => {
                         memberList.push({ id: doc.id, ...doc.data() });
                     });
+                    // 記憶中排序
                     memberList.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
                     setMembers(memberList);
                     setLoading(false);
@@ -129,7 +135,7 @@
                     memberList.forEach(m => { initialExpanded[m.batch] = true; });
                     setExpandedBatches(prev => ({ ...initialExpanded, ...prev }));
                 }, (err) => {
-                    console.error("讀取史冊失敗:", err);
+                    console.error("讀取失敗:", err);
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -152,8 +158,7 @@
                         canvas.height = img.height * scale;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                        setFormData(prev => ({ ...prev, imageUrl: compressedDataUrl }));
+                        setFormData(prev => ({ ...prev, imageUrl: canvas.toDataURL('image/jpeg', 0.6) }));
                         setIsCompressing(false);
                     };
                 };
@@ -162,25 +167,27 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!user) return;
-                const collectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'members');
+                const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 try {
                     if (editingId) {
-                        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'members', editingId);
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
                         await updateDoc(docRef, formData);
                     } else {
                         await addDoc(collectionRef, { ...formData, createdAt: new Date().toISOString() });
                     }
                     resetForm();
-                } catch (error) { console.error("書寫失敗:", error); }
+                } catch (error) { 
+                    console.error("書寫失敗:", error); 
+                }
             };
 
             const executeDelete = async (id) => {
                 if (!user) return;
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'members', id);
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
-                } catch (error) { console.error("抹除失敗:", error); }
+                } catch (error) { console.error(error); }
             };
 
             const resetForm = () => {
@@ -200,7 +207,7 @@
             }, [members]);
 
             if (loading) return (
-                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-200/50">
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-200/50 font-serif">
                     <Feather size={64} className="animate-pulse text-amber-600" />
                     <p className="tracking-[0.8em] mt-8 text-sm opacity-50 uppercase font-bold text-center px-4">隱泉水榭 錄盡英雄</p>
                 </div>
@@ -208,41 +215,33 @@
 
             return (
                 <div className="relative pb-40">
-                    <header className="relative min-h-[75vh] flex items-center justify-center overflow-hidden border-b-2 border-amber-900/20 py-24 bg-gradient-to-b from-[#1a1612]/90 to-[#050505]">
-                        <div className="relative z-20 px-4 max-w-5xl mx-auto flex flex-col items-center text-center w-full">
-                            
-                            {/* Logo: 置中並留白間隔 */}
-                            <div className="flex justify-center mb-16">
-                                <div className="relative p-6">
-                                    <div className="absolute inset-0 border-2 border-amber-600/20 rotate-45" />
-                                    <div className="absolute inset-0 border-2 border-amber-600/20 -rotate-45" />
-                                    <BookOpen size={44} className="text-amber-500 relative z-10 animate-pulse" />
-                                </div>
+                    <header className="relative min-h-[75vh] flex flex-col items-center justify-center overflow-hidden border-b-2 border-amber-900/20 py-24 bg-gradient-to-b from-[#1a1612]/90 to-[#050505]">
+                        <div className="flex justify-center mb-20">
+                            <div className="relative p-6">
+                                <div className="absolute inset-0 border-2 border-amber-600/20 rotate-45" />
+                                <div className="absolute inset-0 border-2 border-amber-600/20 -rotate-45" />
+                                <BookOpen size={44} className="text-amber-500 relative z-10 animate-pulse" />
                             </div>
-                            
-                            {/* 標題：單行、字距拉開、絕對置中 */}
-                            <div className="w-full flex justify-center items-center mb-12">
-                                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)]">
-                                    隱泉水榭·幫會傳承錄
-                                </h1>
+                        </div>
+                        
+                        <div className="w-full flex justify-center items-center mb-12">
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)] text-center pl-[0.5em]">
+                                隱泉水榭·幫會傳承錄
+                            </h1>
+                        </div>
+                        
+                        <div className="flex flex-col items-center gap-12 w-full px-4">
+                            <div className="flex items-center justify-center gap-4 md:gap-12 whitespace-nowrap w-full">
+                                <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-amber-900" />
+                                <p className="text-amber-700 font-bold tracking-[1.2em] text-xs md:text-lg uppercase italic sub-spacing text-center pl-[1.2em]">
+                                    歲 月 忽 已 晚 · 忠 義 永 留 芳
+                                </p>
+                                <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-amber-900" />
                             </div>
-                            
-                            <div className="flex flex-col items-center gap-12 w-full">
-                                {/* 副標題 */}
-                                <div className="flex items-center justify-center gap-4 md:gap-12 whitespace-nowrap w-full">
-                                    <div className="hidden sm:block h-[1px] flex-1 max-w-[100px] bg-gradient-to-r from-transparent to-amber-900" />
-                                    <p className="text-amber-700 font-bold text-xs md:text-lg uppercase italic sub-spacing text-center">
-                                        歲 月 忽 已 晚 · 忠 義 永 留 芳
-                                    </p>
-                                    <div className="hidden sm:block h-[1px] flex-1 max-w-[100px] bg-gradient-to-l from-transparent to-amber-900" />
-                                </div>
-                                
-                                {/* 軍師備註：置中 */}
-                                <div className="max-w-2xl bg-amber-950/10 border-x border-amber-900/20 p-8 backdrop-blur-sm mx-auto text-center">
-                                    <p className="text-amber-700/80 text-[10px] md:text-sm leading-relaxed tracking-[0.2em] italic font-serif">
-                                        我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。
-                                    </p>
-                                </div>
+                            <div className="max-w-2xl bg-amber-950/10 border-x border-amber-900/20 p-8 backdrop-blur-sm mx-auto text-center">
+                                <p className="text-amber-700/80 text-[10px] md:text-sm leading-relaxed tracking-[0.2em] italic font-serif">
+                                    我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。
+                                </p>
                             </div>
                         </div>
                     </header>
@@ -250,8 +249,7 @@
                     <main className="max-w-5xl mx-auto px-6 -mt-32 relative z-30 pb-48 text-center">
                         <div className="space-y-40 inline-block w-full">
                             {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
-                                <section key={batch} className="relative pt-48 w-full">
-                                    {/* 世代印章：下調置頂高度以防與標題重疊 */}
+                                <section key={batch} className="relative pt-48 w-full text-center">
                                     <div className="flex justify-center mb-24 sticky top-80 z-[40]">
                                         <div className="relative cursor-pointer group" onClick={() => setExpandedBatches(p => ({ ...p, [batch]: !p[batch] }))}>
                                             <div className="bg-[#6b0000] text-[#fef3c7] w-32 h-32 flex items-center justify-center rounded-sm shadow-[0_30px_60px_rgba(0,0,0,0.8)] border-[6px] border-double border-[#4a0000] transform transition-all group-hover:scale-110">
@@ -263,7 +261,6 @@
                                             </div>
                                         </div>
                                     </div>
-
                                     {expandedBatches[batch] && (
                                         <div className="space-y-36 relative mt-16 text-left">
                                             <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-[1px] bg-gradient-to-b from-amber-900/60 via-amber-900/5 to-transparent hidden md:block" />
@@ -271,7 +268,7 @@
                                                 <div key={member.id} className={`flex flex-col md:flex-row items-center md:items-start gap-16 ${idx % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'} relative z-10`}>
                                                     <div className="w-full md:w-[60%] group relative">
                                                         <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-amber-900/30 rounded-full blur-[1px]" />
-                                                        <div className="bg-[#12100e] p-10 md:p-12 border-x border-amber-900/30 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] relative overflow-hidden rounded-lg">
+                                                        <div className="bg-[#12100e] p-10 md:p-12 border-x border-amber-900/30 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] relative overflow-hidden rounded-lg group-hover:border-amber-600/40 transition-all duration-500">
                                                             <div className="absolute -bottom-10 -right-10 text-[10rem] opacity-[0.02] pointer-events-none font-black text-amber-500 italic select-none">{member.jobClass}</div>
                                                             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 border-b-2 border-amber-900/20 pb-8 relative z-10">
                                                                 <div className="mb-4">
@@ -302,7 +299,7 @@
                                                             </div>
                                                             <div className="relative mb-12 pl-6">
                                                                 <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-600/50 via-transparent to-amber-600/50" />
-                                                                <p className="text-amber-100/70 text-xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
+                                                                <p className="text-amber-100/70 text-xl md:text-2xl leading-[2.5] italic font-serif">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
                                                             </div>
                                                             <div className="text-[12px] text-amber-900/60 font-black uppercase tracking-[0.5em] pt-8 border-t border-amber-900/10 flex items-center gap-2"><History size={16} /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
@@ -324,9 +321,9 @@
                         <button onClick={() => setIsAdding(true)} className="fixed bottom-20 right-20 w-24 h-24 md:w-28 md:h-28 bg-[#0b2b1d] border-4 border-emerald-900 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[100] group"><div className="text-center flex flex-col items-center"><Plus size={36} className="group-hover:rotate-180 transition-transform duration-500" /><div className="text-[10px] font-black tracking-[0.5em] uppercase mt-1 text-emerald-100">錄入</div></div></button>
                     </main>
 
-                    {/* Editor Modal */}
+                    {/* Modal */}
                     {isAdding && (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/98 backdrop-blur-2xl">
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/98 backdrop-blur-2xl text-left">
                             <div className="bg-[#12100e] border-[3px] border-amber-900/40 w-full max-w-4xl shadow-2xl rounded-sm p-8 md:p-16 max-h-[90vh] overflow-y-auto custom-scrollbar">
                                 <div className="flex justify-between items-center mb-12 border-b-2 border-amber-900/30 pb-8">
                                     <h2 className="text-3xl md:text-5xl font-black tracking-[1em] text-amber-600 uppercase flex items-center gap-6"><Compass size={40} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
@@ -334,14 +331,8 @@
                                 </div>
                                 <form onSubmit={handleSubmit} className="space-y-12">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-4">
-                                            <label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label>
-                                            <input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-4">
-                                            <label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">所 屬 流 派</label>
-                                            <select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                                        </div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">所 屬 流 派</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                     </div>
                                     <div className="space-y-4">
                                         <label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black block text-center sm:text-left">江 湖 畫 像 (本地或網址)</label>
@@ -352,10 +343,10 @@
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
-                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">曾 任 職 位</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
+                                        <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">曾 任 職 位</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
+                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
                                     <button type="submit" className="w-full py-8 bg-[#6b0000] text-[#fef3c7] font-black tracking-[2em] border-4 border-double border-[#4a0000] shadow-2xl hover:bg-[#4a0000] transition-all transform hover:-translate-y-2 text-3xl uppercase text-center">落 筆 成 書</button>
                                 </form>
@@ -363,23 +354,17 @@
                         </div>
                     )}
 
-                    {/* Footer */}
                     <footer className="max-w-4xl mx-auto mt-60 px-6 pb-32 opacity-20 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-900 to-transparent mb-12" />
-                        <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing">
-                            江 湖 路 遠 · 終 會 再 遇
-                        </p>
-                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full">
-                            《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️
-                        </p>
-                        <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full">自古英雄如美人 · 不許人間見白頭</p>
+                        <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.2em]">江 湖 路 遠 · 終 會 在 遇</p>
+                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full pl-[0.5em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                        <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full block">自古英雄如美人 · 不許人間見白頭</p>
                     </footer>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>

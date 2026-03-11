@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>隱泉水榭·幫會傳承錄</title>
-    <!-- 引入江湖必備套件 -->
+    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Babel 編譯器 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入古風字體 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
     
-    <!-- Import Map 解決模組路徑問題 -->
+    <!-- Import Map 解決模組路徑解析問題 -->
     <script type="importmap">
     {
       "imports": {
@@ -29,9 +31,8 @@
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        /* 標題仙氣排版：字距與置中平衡 */
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
-        .sub-spacing { letter-spacing: 1.5em; text-indent: 1.5em; }
+        .sub-spacing { letter-spacing: 1.2em; text-indent: 1.2em; }
 
         @media (max-width: 640px) { 
             .title-spacing { letter-spacing: 0.2em !important; text-indent: 0.2em !important; } 
@@ -49,18 +50,20 @@
         import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         
-        // 解決 React 實體衝突 (Error #31)
+        // 使用 ?external=react 解決 React 實體衝突導致的 Error #31
         import { 
             Plus, Edit2, Trash2, X, Ghost, Upload, 
             BookOpen, Feather, Shield, Crosshair, History, Compass, AlertTriangle 
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
-        // 【靈脈配置修正】：優先使用環境變量以修復 API Key 錯誤
+        // 【核心配置】：自動偵測環境靈力
         // ==========================================
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
+        const getFirebaseConfig = () => {
+            if (typeof __firebase_config !== 'undefined') {
+                return JSON.parse(__firebase_config);
+            }
+            return {
                 apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCclLE2T-w",
                 authDomain: "yin-quan-legacy.firebaseapp.com",
                 projectId: "yin-quan-legacy",
@@ -69,8 +72,11 @@
                 appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
                 measurementId: "G-S5X670YKCT"
             };
-        
+        };
+
+        const firebaseConfig = getFirebaseConfig();
         const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
+        
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -94,7 +100,7 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 核心修正：遵守 Auth Before Queries 規則
+            // 遵守規則三：先驗證再查詢
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -105,20 +111,18 @@
                         }
                     } catch (err) {
                         console.error("靈脈連動失敗", err);
-                        // 即使失敗也嘗試關閉 loading 以顯示空狀態或錯誤 UI
                         setLoading(false);
                     }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    if (u) {
-                        setUser(u);
-                    }
+                    console.log("目前俠客狀態:", u ? "已連線 (" + u.uid + ")" : "斷開連線");
+                    setUser(u);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 數據同步：統一使用 public/data 路徑
+            // 數據同步：統一公共靈脈路徑
             useEffect(() => {
                 if (!user) return;
                 
@@ -132,17 +136,15 @@
                     
                     const expandMap = {};
                     list.forEach(m => { 
-                        if (expandedBatches[m.batch] === undefined) {
-                            expandMap[m.batch] = true;
-                        }
+                        if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true;
                     });
                     setExpandedBatches(prev => ({ ...expandMap, ...prev }));
                 }, (err) => {
-                    console.error("讀取失敗:", err);
+                    console.error("史冊翻閱失敗:", err);
                     setLoading(false);
                 });
                 return () => unsubscribe();
-            }, [user, appId]);
+            }, [user]);
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -169,21 +171,34 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!user || isSaving) return;
-                setIsSaving(true);
+                if (!user) {
+                    alert("靈脈未通（未登入），請重新整理網頁。");
+                    return;
+                }
+                if (isSaving) return;
                 
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                setIsSaving(true);
+                // 剔除 ID 欄位，避免 Firestore 寫入衝突
+                const { id, ...dataToSave } = formData;
+                
                 try {
                     if (editingId) {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
-                        await updateDoc(docRef, formData);
+                        await updateDoc(docRef, dataToSave);
                     } else {
-                        await addDoc(colRef, { ...formData, createdAt: new Date().toISOString() });
+                        const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                        await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
                     }
                     resetForm();
                 } catch (err) {
-                    console.error("落筆失敗", err);
-                    alert("落筆失敗！請檢查 Firebase 規則是否允許讀寫路徑：\n/artifacts/" + appId + "/public/data/members");
+                    console.error("落筆失敗詳細資訊:", err);
+                    let msg = "落筆失敗！\n";
+                    if (err.code === 'permission-denied') {
+                        msg += "【診斷】：權限不足。請務必確認 Firebase 控制台中的 Firestore Rules 已發布為 allow read, write: if true;";
+                    } else {
+                        msg += "【代碼】: " + err.code + "\n【資訊】: " + err.message;
+                    }
+                    alert(msg);
                 } finally {
                     setIsSaving(false);
                 }
@@ -196,8 +211,7 @@
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
                 } catch (e) { 
-                    console.error("抹除失敗", e);
-                    alert("抹除失敗"); 
+                    alert("抹除失敗，請確認權限設定。"); 
                 }
             };
 
@@ -219,13 +233,12 @@
             if (loading) return (
                 <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-200/50">
                     <Feather size={64} className="animate-pulse text-amber-600" />
-                    <p className="tracking-[0.8em] mt-8 text-sm opacity-50 text-center px-4 uppercase font-bold">隱泉水榭 錄盡英雄</p>
+                    <p className="tracking-[0.8em] mt-8 text-sm opacity-50 text-center px-4 font-bold">隱泉水榭 錄盡英雄</p>
                 </div>
             );
 
             return (
                 <div className="relative pb-40">
-                    {/* Header: 標題置中與呼吸感 */}
                     <header className="relative min-h-[75vh] flex flex-col items-center justify-center overflow-hidden border-b-2 border-amber-900/20 py-24 bg-gradient-to-b from-[#1a1612]/90 to-[#050505]">
                         <div className="flex justify-center mb-20">
                             <div className="relative p-6">
@@ -235,23 +248,20 @@
                             </div>
                         </div>
                         
-                        <div className="w-full flex justify-center items-center mb-12 overflow-visible px-4">
-                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)] text-center">
+                        <div className="w-full flex justify-center items-center mb-12 px-4">
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 title-spacing whitespace-nowrap drop-shadow-[0_10px_40px_rgba(0,0,0,1)] text-center pl-[0.5em]">
                                 隱泉水榭·幫會傳承錄
                             </h1>
                         </div>
                         
-                        <div className="flex flex-col items-center gap-12 w-full px-4">
+                        <div className="flex flex-col items-center gap-12 w-full px-4 text-center">
                             <div className="flex items-center justify-center gap-4 md:gap-12 whitespace-nowrap w-full">
                                 <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-amber-900" />
-                                <p className="text-amber-700 font-bold text-xs md:text-lg uppercase italic sub-spacing text-center">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
+                                <p className="text-amber-700 font-bold text-xs md:text-lg uppercase italic sub-spacing pl-[1.2em]">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
                                 <div className="hidden sm:block h-[1px] flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-amber-900" />
                             </div>
-                            
-                            <div className="max-w-2xl bg-amber-950/10 border-x border-amber-900/20 p-8 backdrop-blur-sm mx-auto text-center">
-                                <p className="text-amber-700/80 text-[10px] md:text-sm leading-relaxed tracking-[0.2em] italic font-serif">
-                                    我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。
-                                </p>
+                            <div className="max-w-2xl bg-amber-950/10 border-x border-amber-900/20 p-8 backdrop-blur-sm mx-auto">
+                                <p className="text-amber-700/80 text-[10px] md:text-sm leading-relaxed tracking-[0.2em] italic font-serif">我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。</p>
                             </div>
                         </div>
                     </header>
@@ -327,11 +337,10 @@
                                 </section>
                             ))}
                         </div>
-                        {/* 錄入按鈕 */}
                         <button onClick={() => setIsAdding(true)} className="fixed bottom-20 right-20 w-24 h-24 md:w-28 md:h-28 bg-[#0b2b1d] border-4 border-emerald-900 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[100] group"><div className="text-center flex flex-col items-center text-emerald-100"><Plus size={36} className="group-hover:rotate-180 transition-transform duration-500" /><div className="text-[10px] font-black tracking-[0.5em] uppercase mt-1">錄入</div></div></button>
                     </main>
 
-                    {/* 編輯器 Modal */}
+                    {/* Modal */}
                     {isAdding && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/98 backdrop-blur-2xl text-left">
                             <div className="bg-[#12100e] border-[3px] border-amber-900/40 w-full max-w-4xl shadow-2xl rounded-sm p-8 md:p-16 max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -344,7 +353,7 @@
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">所 屬 流 派</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black block text-center sm:text-left">江 湖 畫 像 (本地或網址)</label><div className="flex flex-col md:flex-row gap-6 p-4 border border-amber-900/10"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-900/10 p-2 text-sm italic text-amber-100" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-8 py-3 border-2 border-amber-900/40 text-xs font-black uppercase hover:bg-amber-900/20 transition-all text-amber-600 font-bold">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
+                                    <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black block text-center sm:text-left">江 湖 畫 像 (本地畫像)</label><div className="flex flex-col md:flex-row gap-6 p-4 border border-amber-900/10"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-900/10 p-2 text-sm italic text-amber-100" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-8 py-3 border-2 border-amber-900/40 text-xs font-black uppercase hover:bg-amber-900/20 transition-all text-amber-600 font-bold">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">曾 任 職 位</label><select className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 cursor-pointer text-amber-100 font-bold" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -366,7 +375,7 @@
                     <footer className="max-w-4xl mx-auto mt-60 px-6 pb-32 opacity-20 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-900 to-transparent mb-12" />
                         <p className="text-lg font-bold text-amber-700 font-serif text-center w-full sub-spacing pl-[1.2em]">江 湖 路 遠 · 終 會 在 遇</p>
-                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                        <p className="text-xs tracking-[0.5em] mb-2 uppercase font-bold text-center w-full pl-[0.5em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         <p className="text-[10px] tracking-[0.2em] opacity-50 italic text-center w-full block">自古英雄如美人 · 不許人間見白頭</p>
                     </footer>
                 </div>

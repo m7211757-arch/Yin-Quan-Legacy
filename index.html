@@ -100,7 +100,7 @@
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
             });
 
-            // 確保認證流程穩定
+            // 認證流程：確保 Auth 在所有查詢之前
             useEffect(() => {
                 const initAuth = async () => {
                     console.log("正在呼喚靈脈...");
@@ -112,8 +112,7 @@
                         }
                     } catch (err) {
                         console.error("靈脈連動失敗", err);
-                        alert("靈脈覺醒失敗！請檢查 Firebase 控制台中 Authentication 是否開啟了「匿名登入」。");
-                        setLoading(false);
+                        // 不要在這裡 alert，讓 handleSubmit 去處理報錯
                     }
                 };
                 initAuth();
@@ -126,7 +125,7 @@
                 return () => unsubscribe();
             }, []);
 
-            // 數據監控
+            // 數據監聽：使用公共路徑
             useEffect(() => {
                 if (!user) return;
                 
@@ -175,18 +174,17 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                console.log("【落筆中】發起提交指令...");
+                console.log("【觸發】提交按鈕按下...");
 
                 if (!user) {
-                    console.error("提交攔截：無有效身分");
-                    alert("靈脈未通！請先確認 Firebase 後台已開啟「匿名登入 (Anonymous)」登入方法。");
+                    console.error("提交失敗：身分驗證未通過");
+                    alert("靈脈未通！請先確認 Firebase 後台 Authentication 已開啟「匿名登入 (Anonymous)」登入方法。");
                     return;
                 }
                 
                 if (isSaving) return;
                 
                 setIsSaving(true);
-                // 剔除 ID 避免寫入衝突
                 const { id, ...dataToSave } = formData;
                 
                 try {
@@ -194,19 +192,19 @@
                     if (editingId) {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
                         await updateDoc(docRef, dataToSave);
-                        console.log("【重修成功】");
+                        console.log("重修史冊成功");
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
-                        console.log("【錄入成功】");
+                        console.log("錄入英雄成功");
                     }
                     resetForm();
                 } catch (err) {
                     console.error("落筆失敗:", err);
                     let msg = "落筆失敗！\n";
                     if (err.code === 'permission-denied') {
-                        msg += "原因：權限不足。請檢查 Firebase Firestore 的 Rules 規則是否已發布為 allow read, write: if true;";
+                        msg += "原因：權限不足。請檢查 Firebase Firestore Rules 是否已發布為 allow read, write: if true;";
                     } else {
-                        msg += "代碼：" + err.code + "\n訊息：" + err.message;
+                        msg += "錯誤代碼: " + err.code + "\n訊息: " + err.message;
                     }
                     alert(msg);
                 } finally {
@@ -282,7 +280,7 @@
                                         <div className="relative cursor-pointer group" onClick={() => setExpandedBatches(p => ({ ...p, [batch]: !p[batch] }))}>
                                             <div className="bg-[#6b0000] text-[#fef3c7] w-32 h-32 flex items-center justify-center rounded-sm shadow-2xl border-[6px] border-double border-[#4a0000] transform transition-all group-hover:scale-110">
                                                 <div className="text-center font-black">
-                                                    <div className="text-[10px] opacity-60 tracking-[0.2em] mb-1">江湖世代</div>
+                                                    <div className="text-[10px] opacity-60 tracking-[0.2em] mb-1 uppercase">江湖世代</div>
                                                     <div className="text-4xl">第{batch}批</div>
                                                     <div className="text-xs opacity-80 mt-1 font-serif tracking-[0.4em]">傳承錄</div>
                                                 </div>
@@ -334,7 +332,7 @@
                                                     </div>
                                                     <div className="w-full md:w-[30%] mt-12 md:mt-20">
                                                         <div className="aspect-[3/4] bg-black border-[16px] border-[#1a1612] shadow-2xl relative overflow-hidden rounded-sm group/img">
-                                                            {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-30 grayscale group-hover/img:grayscale-0 group-hover/img:opacity-100 transition-all duration-700 scale-110 group-hover/img:scale-100" alt={member.name} /> : <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><Ghost size={100} /><span className="text-sm tracking-[1em] mt-4 text-center">影跡全無</span></div>}
+                                                            {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-30 grayscale group-hover/img:grayscale-0 group-hover/img:opacity-100 transition-all duration-1000 scale-110 group-hover/img:scale-100" alt={member.name} /> : <div className="w-full h-full flex flex-col items-center justify-center opacity-10"><Ghost size={100} /><span className="text-sm tracking-[1em] mt-4 text-center">影跡全無</span></div>}
                                                             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-90" />
                                                         </div>
                                                     </div>
@@ -356,7 +354,6 @@
                                     <h2 className="text-3xl md:text-5xl font-black tracking-[1em] text-amber-600 uppercase flex items-center gap-6"><Compass size={40} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
                                     <button onClick={resetForm} className="text-amber-900 hover:text-amber-500 transition-all hover:rotate-90 duration-300"><X size={48} /></button>
                                 </div>
-                                {/* 這裡確保 form 有連結到 handleSubmit */}
                                 <form onSubmit={handleSubmit} className="space-y-12">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-3xl outline-none focus:border-amber-600 text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
@@ -370,7 +367,6 @@
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-900/20 p-4 text-2xl outline-none focus:border-amber-600 text-amber-100 font-bold" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
                                     <div className="space-y-4"><label className="text-sm text-amber-800 uppercase tracking-[0.8em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/30 border-2 border-amber-900/20 p-8 text-xl italic font-serif leading-relaxed outline-none focus:border-amber-600 text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
                                     
-                                    {/* 這裡確保 button 是 type="submit" */}
                                     <button 
                                         type="submit" 
                                         disabled={isSaving}

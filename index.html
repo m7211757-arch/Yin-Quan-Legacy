@@ -82,7 +82,7 @@
         import React, { useState, useEffect, useMemo, useRef } from 'react';
         import ReactDOM from 'react-dom/client';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
-        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, setDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, setDoc, query, getDocs, writeBatch } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         
         import { 
@@ -126,6 +126,7 @@
             const [members, setMembers] = useState([]);
             const [events, setEvents] = useState([]);
             
+            // 背景幻燈片狀態
             const [bgUrls, setBgUrls] = useState([]);
             const [bgIndex, setBgIndex] = useState(0);
             const [nextBgIndex, setNextBgIndex] = useState(0);
@@ -155,7 +156,7 @@
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, async (u) => {
                     if (!u) {
-                        try { await signInAnonymously(auth); } catch (err) { console.error(err); }
+                        try { await signInAnonymously(auth); } catch (err) { console.error("認證失敗", err); }
                     } else {
                         setUser(u);
                         setLoading(false);
@@ -164,17 +165,18 @@
                 return () => unsubscribe();
             }, []);
 
+            // 數據同步：背景幻燈片 (重塑為集合模式，解決 1MB 限制)
             useEffect(() => {
-                const bgRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'appearance');
-                const unsubscribe = onSnapshot(bgRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const data = snapshot.data();
-                        const urls = data.bgUrls || (data.bgUrl ? [data.bgUrl] : []);
-                        setBgUrls(urls);
-                    }
+                if (!user) return;
+                const bgCol = collection(db, 'artifacts', appId, 'public', 'data', 'backgrounds');
+                const unsubscribe = onSnapshot(bgCol, (snapshot) => {
+                    const urls = snapshot.docs.map(d => d.data().url);
+                    setBgUrls(urls);
+                }, (error) => {
+                    console.error("背景讀取失敗:", error);
                 });
                 return () => unsubscribe();
-            }, []);
+            }, [user]);
 
             useEffect(() => {
                 if (bgUrls.length > 1) {
@@ -188,6 +190,7 @@
                 }
             }, [bgUrls]);
 
+            // 數據同步：內容
             useEffect(() => {
                 if (!user) return;
                 const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'members');
@@ -216,7 +219,7 @@
                 try {
                     await signInWithEmailAndPassword(auth, loginEmail, loginPass);
                     setShowLogin(false);
-                } catch (err) { alert("身分驗證失敗。"); }
+                } catch (err) { alert("身分驗證失敗，請確認密令。"); }
             };
 
             const handleLogout = async () => {
@@ -235,11 +238,11 @@
                     img.src = ev.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = target === 'bg' ? 1920 : 800;
+                        const MAX_WIDTH = target === 'bg' ? 1600 : 800; // 稍微調低寬度以保證穩定性
                         canvas.width = MAX_WIDTH;
                         canvas.height = img.height * (MAX_WIDTH / img.width);
                         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.5); // 調低質量係數
                         if (target === 'bg') addBackground(dataUrl);
                         else setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
                         setIsCompressing(false);
@@ -250,16 +253,24 @@
             const addBackground = async (url) => {
                 if (!isManagement) return;
                 try {
-                    const bgRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'appearance');
-                    await setDoc(bgRef, { bgUrls: arrayUnion(url) }, { merge: true });
-                } catch (e) { alert("背景錄入失敗！"); }
+                    const bgCol = collection(db, 'artifacts', appId, 'public', 'data', 'backgrounds');
+                    await addDoc(bgCol, { url, createdAt: new Date().toISOString() });
+                } catch (e) { 
+                    console.error(e);
+                    alert("背景錄入失敗！可能是圖片檔案過大。"); 
+                }
             };
 
             const clearBackgrounds = async () => {
-                if (!isManagement || !confirm("確定要重置背景嗎？")) return;
-                const bgRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'appearance');
-                await setDoc(bgRef, { bgUrls: [], bgUrl: "" });
-                setBgUrls([]);
+                if (!isManagement || !confirm("確定要重置背景嗎？這將抹除目前所有的幻燈片。")) return;
+                try {
+                    const bgCol = collection(db, 'artifacts', appId, 'public', 'data', 'backgrounds');
+                    const snapshot = await getDocs(bgCol);
+                    const batch = writeBatch(db);
+                    snapshot.docs.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                    setBgUrls([]);
+                } catch (e) { alert("重置失敗！"); }
             };
 
             const handleSubmit = async (e) => {
@@ -303,12 +314,13 @@
             if (loading) return (
                 <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-300 font-serif">
                     <Feather size={60} className="animate-pulse text-amber-500 mb-6" />
-                    <p className="tracking-[1em] text-lg font-black uppercase">隱泉水榭 錄盡英雄</p>
+                    <p className="tracking-[1em] text-lg font-black uppercase glow-text">隱泉水榭 錄盡英雄</p>
                 </div>
             );
 
             return (
                 <div className="relative pb-40">
+                    {/* 幻燈片背景 */}
                     {bgUrls.length > 0 ? (
                         <>
                             <div className="bg-custom-layer" style={{ backgroundImage: `url(${bgUrls[bgIndex]})`, opacity: 1 }}></div>
@@ -457,7 +469,6 @@
                         </footer>
                     </div>
 
-                    {/* 修正：錄入按鈕移至 comfort-zoom 外部，確保固定在螢幕上 */}
                     {isManagement && (
                         <button onClick={() => setIsAdding(true)} className="fixed bottom-10 right-6 md:bottom-20 md:right-20 w-16 h-16 md:w-32 md:h-32 bg-[#0c3b28] text-emerald-50 border-4 md:border-8 border-emerald-700 shadow-[0_40px_100px_rgba(0,80,40,0.8)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[500] group rounded-full">
                             <div className="text-center flex flex-col items-center">
@@ -467,10 +478,9 @@
                         </button>
                     )}
 
-                    {/* Modals */}
                     {showLogin && (
-                        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-3xl">
-                            <div className="bg-[#1a1714] border-2 md:border-[4px] border-amber-800/40 w-full max-w-lg shadow-2xl rounded-sm p-6 md:p-12 text-left">
+                        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-3xl text-left">
+                            <div className="bg-[#1a1714] border-2 md:border-[4px] border-amber-800/40 w-full max-w-lg shadow-2xl rounded-sm p-6 md:p-12">
                                 <div className="flex justify-between items-center mb-8 border-b border-amber-900/30 pb-4 text-amber-500">
                                     <h2 className="text-xl md:text-3xl font-black tracking-[0.3em] flex items-center gap-3"><Lock size={24}/> 管理山門</h2>
                                     <button onClick={() => setShowLogin(false)}><X size={24}/></button>
@@ -492,9 +502,9 @@
                                     <button onClick={resetForm} className="hover:text-white transition-all hover:rotate-90 duration-300"><X size={32} /></button>
                                 </div>
                                 <div className="mb-12 p-6 border-2 border-amber-900/30 bg-black/20 rounded-xl">
-                                    <label className="text-sm text-amber-500 uppercase tracking-[0.2em] font-black flex items-center gap-3 mb-6"><ImageIcon size={20}/> 幻化江山 (背景幻燈片)</label>
+                                    <label className="text-sm text-amber-50 uppercase tracking-[0.2em] font-black flex items-center gap-3 mb-6"><ImageIcon size={20}/> 幻化江山 (背景幻燈片)</label>
                                     <div className="flex flex-col md:flex-row gap-6 items-center">
-                                        <div className="flex-1 w-full text-xs text-amber-700 italic">目前已有 {bgUrls.length} 張風景。每 10 秒自動更換。</div>
+                                        <div className="flex-1 w-full text-xs text-amber-700 italic">目前已有 {bgUrls.length} 張風景。不限數量，系統會自動輪換。</div>
                                         <div className="flex gap-4"><input type="file" accept="image/*" className="hidden" ref={bgInputRef} onChange={(e) => handleImageUpload(e, 'bg')} /><button type="button" onClick={() => bgInputRef.current?.click()} className="px-6 py-3 border-2 border-amber-500/40 text-xs font-black text-amber-400 flex items-center gap-2"><Plus size={16}/> 增加風景</button><button type="button" onClick={clearBackgrounds} className="px-6 py-3 border-2 border-red-900/40 text-xs font-black text-red-400 flex items-center gap-2"><RefreshCw size={16}/> 重置</button></div>
                                     </div>
                                 </div>

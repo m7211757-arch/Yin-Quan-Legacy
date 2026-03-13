@@ -108,7 +108,8 @@
         const db = getFirestore(app);
 
         const CLASSES = ['碎夢', '龍吟', '血河', '神相', '九靈', '素問', '鐵衣', '玄機', '荒羽', '鴻音', '潮光'];
-        const POSITIONS = ['幫眾', '堂主', '副堂主', '宴者', '雅匠', '文士', '接待', '軍師', '當家'];
+        // 修正：加入「大當家」職位
+        const POSITIONS = ['幫眾', '堂主', '副堂主', '宴者', '雅匠', '文士', '接待', '軍師', '當家', '大當家'];
         const EVENT_TYPES = ['幫會戰鬥', '江湖盟約', '周年慶典', '勢力更迭', '成員聚首', '其他大事'];
 
         const toChineseNumber = (num) => {
@@ -165,7 +166,6 @@
                 return () => unsubscribe();
             }, []);
 
-            // 幻燈片背景
             useEffect(() => {
                 if (!user) return;
                 const bgCol = collection(db, 'artifacts', appId, 'public', 'data', 'backgrounds');
@@ -186,7 +186,6 @@
                 }
             }, [bgUrls]);
 
-            // 同步內容與排序
             useEffect(() => {
                 if (!user) return;
                 const mCol = collection(db, 'artifacts', appId, 'public', 'data', 'members');
@@ -194,7 +193,6 @@
                 
                 const unsubM = onSnapshot(mCol, (snapshot) => {
                     const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // 排序邏輯：世代 (batch) 為主，自定義順序 (sortOrder) 為輔
                     list.sort((a, b) => {
                         if (a.batch !== b.batch) return a.batch - b.batch;
                         return (a.sortOrder || 0) - (b.sortOrder || 0);
@@ -268,19 +266,15 @@
                 setBgUrls([]);
             };
 
-            // 俠客位置調換邏輯
             const moveMember = async (currentIndex, direction) => {
                 if (!isManagement) return;
                 const batchMembers = members.filter(m => m.batch === members[currentIndex].batch);
                 const memberInBatchIndex = batchMembers.findIndex(m => m.id === members[currentIndex].id);
-                
                 const targetInBatchIndex = memberInBatchIndex + direction;
                 if (targetInBatchIndex < 0 || targetInBatchIndex >= batchMembers.length) return;
 
                 const memberA = batchMembers[memberInBatchIndex];
                 const memberB = batchMembers[targetInBatchIndex];
-
-                // 確保都有 sortOrder
                 const orderA = memberA.sortOrder || currentIndex;
                 const orderB = memberB.sortOrder || (currentIndex + direction);
 
@@ -303,7 +297,6 @@
                     if (editingId) {
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', colName, editingId), dataToSave);
                     } else {
-                        // 新錄入時給予一個預設的 sortOrder (用時間戳確保在最後)
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString(), sortOrder: Date.now() });
                     }
                     resetForm();
@@ -403,7 +396,6 @@
                                                         <div className="w-full md:w-[65%] bg-[#14110e]/95 backdrop-blur-sm p-6 md:p-14 border-x-2 md:border-x-4 border-amber-700/30 rounded-xl card-glow relative overflow-hidden">
                                                             <div className="absolute -bottom-8 -right-8 md:-bottom-16 md:-right-16 text-[6rem] md:text-[12rem] opacity-[0.03] font-black text-amber-400 italic select-none break-all">{member.jobClass}</div>
                                                             
-                                                            {/* 排序調整箭頭 (僅管理層可見) */}
                                                             {isManagement && (
                                                                 <div className={`absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-8 z-50`}>
                                                                     <button onClick={() => moveMember(member.globalIndex, -1)} className="p-2 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10" disabled={idxInGroup === 0}><ChevronUp size={32} /></button>
@@ -538,9 +530,26 @@
                                 </div>
                                 <form onSubmit={handleSubmit} className="space-y-8 md:space-y-12">
                                     {activeTab === 'members' ? (
-                                        <><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">傳 承 世 代 (數字)</label><input type="number" className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div></div></>
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">傳 承 世 代 (數字)</label><input type="number" className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                            </div>
+                                            {/* 修正：找回失蹤的活躍時期欄位 */}
+                                            <div className="space-y-2"><label className="text-xs text-amber-50 font-black">活 躍 時 期 (例：魔獸老兵季、滄海版本)</label><input className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
+                                        </>
                                     ) : (
-                                        <><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-50" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div></>
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-50" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                                            </div>
+                                            <div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                        </>
                                     )}
                                     <div className="space-y-4"><label className="text-xs text-amber-50 font-black block">俠 客 畫 像 (本地或網址)</label><div className="flex flex-col md:flex-row gap-4 p-4 border border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-2 text-sm italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-6 py-3 border border-amber-500/40 text-xs font-black uppercase text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
                                     <div className="space-y-4"><label className="text-xs text-amber-50 font-black">誌 異 / 詳 情</label><textarea rows="5" className="w-full bg-black/50 border border-amber-500/20 p-4 md:p-8 text-lg md:text-xl italic font-serif outline-none text-amber-50" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>

@@ -21,19 +21,24 @@
 
     <style>
         body { font-family: 'Noto Serif TC', serif; background-color: #050505; color: #fde68a; scroll-behavior: smooth; }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #78350f; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #b91c1c; }
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
-        .sub-spacing { letter-spacing: 0.8em; text-indent: 0.8em; }
+        /* 響應式標題字距控制 */
+        .title-spacing { letter-spacing: 0.2em; text-indent: 0.2em; }
+        .sub-spacing { letter-spacing: 0.3em; text-indent: 0.3em; }
 
-        @media (max-width: 1024px) { 
-            .title-spacing { letter-spacing: 0.2em !important; text-indent: 0.2em !important; } 
-            .sub-spacing { letter-spacing: 0.3em !important; text-indent: 0.3em !important; }
+        @media (min-width: 768px) { 
+            .title-spacing { letter-spacing: 0.4em; text-indent: 0.4em; } 
+            .sub-spacing { letter-spacing: 0.8em; text-indent: 0.8em; }
+        }
+        @media (min-width: 1280px) { 
+            .title-spacing { letter-spacing: 0.6em; text-indent: 0.6em; } 
+            .sub-spacing { letter-spacing: 1.5em; text-indent: 1.5em; }
         }
         
         .glow-text { text-shadow: 0 0 15px rgba(251, 191, 36, 0.7), 0 0 30px rgba(251, 191, 36, 0.4); }
@@ -242,84 +247,84 @@
 
             if (loading) return (
                 <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-amber-300 font-serif">
-                    <Feather size={80} className="animate-pulse text-amber-500 mb-10" />
-                    <p className="tracking-[1.2em] text-xl font-black uppercase glow-text">隱泉水榭 錄盡英雄</p>
+                    <Feather size={60} className="animate-pulse text-amber-500 mb-6 md:mb-10" />
+                    <p className="tracking-[0.8em] md:tracking-[1.2em] text-lg md:text-xl font-black uppercase glow-text">隱泉水榭 錄盡英雄</p>
                 </div>
             );
 
             return (
-                <div className="relative pb-60">
-                    {/* Navigation */}
-                    <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/80 backdrop-blur-md border-b border-amber-900/30 flex justify-center p-4 gap-8">
+                <div className="relative pb-40">
+                    {/* Navigation - 手機版優化 */}
+                    <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-md border-b border-amber-900/30 flex justify-center p-2 md:p-4 gap-2 md:gap-8">
                         <button 
                             onClick={() => { setActiveTab('members'); window.scrollTo(0,0); }}
-                            className={`flex items-center gap-4 px-10 py-3 text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'members' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
+                            className={`flex items-center gap-2 md:gap-4 px-4 md:px-10 py-2 md:py-3 text-sm md:text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'members' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
                         >
-                            <Scroll size={24} /> 俠客傳承
+                            <Scroll size={20} className="md:w-6 md:h-6" /> 俠客傳承
                         </button>
                         <button 
                             onClick={() => { setActiveTab('events'); window.scrollTo(0,0); }}
-                            className={`flex items-center gap-4 px-10 py-3 text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'events' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
+                            className={`flex items-center gap-2 md:gap-4 px-4 md:px-10 py-2 md:py-3 text-sm md:text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'events' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
                         >
-                            <Landmark size={24} /> 大事編年
+                            <Landmark size={20} className="md:w-6 md:h-6" /> 大事編年
                         </button>
                     </nav>
 
-                    {/* Header */}
-                    <header className="relative min-h-[85vh] flex flex-col items-center justify-center overflow-hidden border-b-4 border-amber-500/20 py-32 bg-gradient-to-b from-[#201a14] to-[#050505] mt-16">
-                        <div className="flex justify-center mb-16">
-                            <div className="relative p-8">
-                                <div className="absolute inset-0 border-4 border-amber-400/50 rotate-45 animate-pulse" />
-                                <div className="absolute inset-0 border-4 border-amber-400/50 -rotate-45 animate-pulse" />
-                                <BookOpen size={56} className="text-amber-400 relative z-10" />
+                    {/* Header - 手機版字體縮小 */}
+                    <header className="relative min-h-[60vh] md:min-h-[85vh] flex flex-col items-center justify-center overflow-hidden border-b-4 border-amber-500/20 py-20 md:py-32 bg-gradient-to-b from-[#201a14] to-[#050505] mt-12 md:mt-16">
+                        <div className="flex justify-center mb-8 md:mb-16">
+                            <div className="relative p-4 md:p-8">
+                                <div className="absolute inset-0 border-2 md:border-4 border-amber-400/50 rotate-45 animate-pulse" />
+                                <div className="absolute inset-0 border-2 md:border-4 border-amber-400/50 -rotate-45 animate-pulse" />
+                                <BookOpen size={36} className="text-amber-400 relative z-10 md:w-14 md:h-14" />
                             </div>
                         </div>
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-amber-400 title-spacing drop-shadow-[0_15px_40px_rgba(0,0,0,1)] text-center pl-[0.5em] glow-text mb-12">
+                        <h1 className="text-3xl md:text-7xl lg:text-9xl font-black text-amber-400 title-spacing drop-shadow-[0_10px_30px_rgba(0,0,0,1)] text-center px-4 glow-text mb-8 md:mb-12">
                             {activeTab === 'members' ? '隱泉水榭·幫會傳承錄' : '隱泉水榭·大事編年史'}
                         </h1>
-                        <p className="text-amber-500 font-black tracking-[1em] text-lg md:text-2xl uppercase italic sub-spacing pl-[0.8em] drop-shadow-md">
+                        <p className="text-amber-500 font-black tracking-[0.3em] md:tracking-[1em] text-xs md:text-2xl uppercase italic sub-spacing text-center px-6 drop-shadow-md">
                             {activeTab === 'members' ? '歲 月 忽 已 晚 · 忠 義 永 留 芳' : '興 衰 皆 史 冊 · 往 事 總 留 痕'}
                         </p>
                     </header>
 
-                    <main className="max-w-[95rem] mx-auto px-10 -mt-32 relative z-30 pb-60 text-center">
+                    <main className="max-w-[95rem] mx-auto px-4 md:px-10 -mt-16 md:-mt-32 relative z-30 pb-40 text-center">
                         
                         {/* 俠客傳承 */}
                         {activeTab === 'members' && (
-                            <div className="space-y-48 inline-block w-full">
+                            <div className="space-y-24 md:space-y-48 inline-block w-full">
                                 {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
-                                    <section key={batch} className="relative pt-24 w-full">
-                                        <div className="flex justify-center mb-24">
-                                            <div className="bg-[#8b0000] text-[#fffdeb] px-12 py-6 border-[5px] border-double border-[#600000] shadow-[0_30px_60px_rgba(0,0,0,1)]">
-                                                <div className="text-xs opacity-90 tracking-[0.3em] font-black text-amber-200">江湖世代</div>
-                                                <div className="text-6xl font-black glow-text">第 {batch} 批</div>
+                                    <section key={batch} className="relative pt-12 md:pt-24 w-full">
+                                        <div className="flex justify-center mb-12 md:mb-24">
+                                            <div className="bg-[#8b0000] text-[#fffdeb] px-6 md:px-12 py-3 md:py-6 border-[3px] md:border-[5px] border-double border-[#600000] shadow-[0_15px_30px_rgba(0,0,0,0.8)]">
+                                                <div className="text-[10px] md:text-xs opacity-90 tracking-[0.2em] font-black text-amber-200 uppercase">江湖世代</div>
+                                                <div className="text-3xl md:text-6xl font-black glow-text">第 {batch} 批</div>
                                             </div>
                                         </div>
-                                        <div className="space-y-40 text-left">
+                                        <div className="space-y-20 md:space-y-40 text-left">
                                             {batchMembers.map((member, idx) => (
-                                                <div key={member.id} className={`flex flex-col md:flex-row items-center md:items-start gap-20 ${idx % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'}`}>
-                                                    <div className="w-full md:w-[65%] bg-[#14110e] p-10 md:p-14 border-x-4 border-amber-700/30 rounded-xl card-glow relative overflow-hidden">
-                                                        <div className="absolute -bottom-16 -right-16 text-[12rem] opacity-[0.03] font-black text-amber-400 italic select-none">{member.jobClass}</div>
-                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 border-b-4 border-amber-500/20 pb-10">
+                                                <div key={member.id} className={`flex flex-col ${idx % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'} items-center md:items-start gap-10 md:gap-20`}>
+                                                    <div className="w-full md:w-[65%] bg-[#14110e] p-6 md:p-14 border-x-2 md:border-x-4 border-amber-700/30 rounded-xl card-glow relative overflow-hidden">
+                                                        <div className="absolute -bottom-8 -right-8 md:-bottom-16 md:-right-16 text-[6rem] md:text-[12rem] opacity-[0.03] font-black text-amber-400 italic select-none">{member.jobClass}</div>
+                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-10 border-b-2 md:border-b-4 border-amber-500/20 pb-6 md:pb-10">
                                                             <div>
-                                                                <h3 className="text-5xl md:text-6xl font-black text-amber-50 tracking-widest glow-text mb-4">{member.name}</h3>
-                                                                <div className="flex gap-8 text-amber-400 font-black tracking-[0.4em] text-base uppercase">
-                                                                    <span><Shield className="inline mr-3" size={20}/>{member.position}</span>
-                                                                    <span><Crosshair className="inline mr-3" size={20}/>{member.jobClass}</span>
+                                                                <h3 className="text-3xl md:text-6xl font-black text-amber-50 tracking-widest glow-text mb-4">{member.name}</h3>
+                                                                <div className="flex flex-wrap gap-4 md:gap-8 text-amber-400 font-black tracking-[0.2em] md:tracking-[0.4em] text-xs md:text-base uppercase">
+                                                                    <span className="flex items-center gap-1"><Shield size={16} className="md:w-5 md:h-5"/>{member.position}</span>
+                                                                    <span className="flex items-center gap-1"><Crosshair size={16} className="md:w-5 md:h-5"/>{member.jobClass}</span>
                                                                 </div>
                                                             </div>
                                                             {isManagement && (
-                                                                <div className="flex gap-6 mt-6 md:mt-0">
-                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-500/10 hover:bg-amber-400 hover:text-black rounded-lg transition-all border-2 border-amber-500/20"><Edit2 size={24}/></button>
-                                                                    <button onClick={() => setConfirmDeleteId(member.id)} className="p-3 bg-amber-500/5 hover:bg-red-600 rounded-lg transition-all border-2 border-amber-500/10"><Trash2 size={24}/></button>
+                                                                <div className="flex gap-4 mt-6 md:mt-0">
+                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-2 md:p-3 bg-amber-500/10 hover:bg-amber-400 hover:text-black rounded-lg transition-all border border-amber-500/20"><Edit2 size={20}/></button>
+                                                                    <button onClick={() => setConfirmDeleteId(member.id)} className="p-2 md:p-3 bg-amber-500/5 hover:bg-red-600 rounded-lg transition-all border border-amber-500/10"><Trash2 size={20}/></button>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <p className="text-amber-50/90 text-xl md:text-2xl leading-[2.6] italic font-serif mb-12 pl-10 border-l-4 border-amber-500/30">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
-                                                        <div className="text-sm text-amber-500 font-black uppercase tracking-[0.6em] flex items-center gap-5 border-t-2 border-amber-500/10 pt-10"><History size={20}/> 活躍時期：{member.period || '不詳'}</div>
+                                                        <p className="text-amber-50/90 text-lg md:text-2xl leading-[2.2] md:leading-[2.6] italic font-serif mb-8 md:mb-12 pl-4 md:pl-10 border-l-2 md:border-l-4 border-amber-500/30">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
+                                                        <div className="text-[10px] md:text-sm text-amber-500 font-black uppercase tracking-[0.3em] md:tracking-[0.6em] flex items-center gap-3 md:gap-5 border-t md:border-t-2 border-amber-500/10 pt-6 md:pt-10"><History size={16} className="md:w-5 md:h-5"/> 活躍時期：{member.period || '不詳'}</div>
                                                     </div>
-                                                    <div className="w-full md:w-[35%] aspect-[3/4] bg-black border-[16px] border-[#1e1a16] shadow-xl overflow-hidden rounded-sm relative">
-                                                        {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-1000" /> : <div className="h-full flex flex-col items-center justify-center text-amber-900/10"><Ghost size={120}/><span className="text-lg tracking-[1.5em] font-black">影跡全無</span></div>}
+                                                    <div className="w-full md:w-[35%] aspect-[3/4] bg-black border-8 md:border-[16px] border-[#1e1a16] shadow-xl overflow-hidden rounded-sm relative">
+                                                        {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-1000" /> : <div className="h-full flex flex-col items-center justify-center text-amber-900/10"><Ghost size={80} className="md:w-30 md:h-30"/><span className="text-sm md:text-lg tracking-[1em] font-black uppercase">影跡全無</span></div>}
                                                     </div>
                                                 </div>
                                             ))}
@@ -329,32 +334,32 @@
                             </div>
                         )}
 
-                        {/* 大事編年 */}
+                        {/* 大事編年 - 手機版單欄優化 */}
                         {activeTab === 'events' && (
-                            <div className="relative max-w-6xl mx-auto py-24 px-6 text-left">
-                                <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[4px] timeline-line -translate-x-1/2" />
+                            <div className="relative max-w-6xl mx-auto py-12 md:py-24 px-2 md:px-6 text-left">
+                                <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-[2px] md:w-[4px] timeline-line -translate-x-1/2" />
                                 {events.length === 0 ? (
-                                    <p className="text-center text-3xl font-black text-amber-800 tracking-[1em] py-40">史 冊 空 白 · 待 君 揮 毫</p>
+                                    <p className="text-center text-xl md:text-3xl font-black text-amber-800 tracking-[0.5em] md:tracking-[1em] py-40">史 冊 空 白 · 待 君 揮 毫</p>
                                 ) : (
                                     events.map((ev, idx) => (
-                                        <div key={ev.id} className={`relative flex flex-col md:flex-row items-center justify-between mb-32 w-full ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
+                                        <div key={ev.id} className={`relative flex flex-col md:flex-row items-center justify-between mb-16 md:mb-32 w-full ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
                                             <div className="hidden md:block w-[45%]" />
-                                            <div className="absolute left-8 md:left-1/2 -translate-x-1/2 w-12 h-12 bg-[#8b0000] border-4 border-amber-500 rounded-full z-10 shadow-[0_0_20px_rgba(245,158,11,0.5)] flex items-center justify-center"><Landmark size={20} className="text-amber-100" /></div>
-                                            <div className="w-full md:w-[45%] pl-20 md:pl-0">
-                                                <div className="bg-[#14110e] p-10 border-x-4 border-amber-700/30 rounded-xl card-glow relative group">
-                                                    <div className="flex justify-between items-start mb-6">
-                                                        <span className="text-amber-500 font-black text-2xl tracking-[0.2em] bg-amber-950/30 px-6 py-2 border border-amber-500/20">{ev.date}</span>
+                                            <div className="absolute left-6 md:left-1/2 -translate-x-1/2 w-8 h-8 md:w-12 md:h-12 bg-[#8b0000] border-2 md:border-4 border-amber-500 rounded-full z-10 shadow-[0_0_20px_rgba(245,158,11,0.5)] flex items-center justify-center"><Landmark size={16} className="text-amber-100 md:w-5 md:h-5" /></div>
+                                            <div className="w-full md:w-[45%] pl-14 md:pl-0">
+                                                <div className="bg-[#14110e] p-6 md:p-10 border-x-2 md:border-x-4 border-amber-700/30 rounded-xl card-glow relative group">
+                                                    <div className="flex justify-between items-start mb-4 md:mb-6">
+                                                        <span className="text-amber-500 font-black text-lg md:text-2xl tracking-[0.1em] bg-amber-950/30 px-3 md:px-6 py-1 md:py-2 border border-amber-500/20">{ev.date}</span>
                                                         {isManagement && (
-                                                            <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => { setFormData(ev); setEditingId(ev.id); setIsAdding(true); }} className="p-2 text-amber-600 hover:text-amber-400"><Edit2 size={20}/></button>
-                                                                <button onClick={() => executeDelete(ev.id)} className="p-2 text-amber-900 hover:text-red-600"><Trash2 size={20}/></button>
+                                                            <div className="flex gap-2 md:gap-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => { setFormData(ev); setEditingId(ev.id); setIsAdding(true); }} className="p-1 text-amber-600 hover:text-amber-400"><Edit2 size={18}/></button>
+                                                                <button onClick={() => executeDelete(ev.id)} className="p-1 text-amber-900 hover:text-red-600"><Trash2 size={18}/></button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <h3 className="text-4xl md:text-5xl font-black text-amber-50 mb-6 glow-text tracking-widest">{ev.title}</h3>
-                                                    <span className="inline-block bg-[#600000] text-amber-100 text-xs px-4 py-1 font-bold tracking-[0.3em] mb-8 uppercase">{ev.eventType}</span>
-                                                    <p className="text-amber-100/80 text-xl leading-relaxed font-serif italic">{ev.description}</p>
-                                                    {ev.imageUrl && <img src={ev.imageUrl} className="mt-8 w-full h-64 object-cover rounded-sm border-4 border-[#1e1a16] opacity-60 hover:opacity-100 transition-all duration-700" />}
+                                                    <h3 className="text-2xl md:text-5xl font-black text-amber-50 mb-3 md:mb-6 glow-text tracking-widest">{ev.title}</h3>
+                                                    <span className="inline-block bg-[#600000] text-amber-100 text-[10px] md:text-xs px-3 py-0.5 md:py-1 font-bold tracking-[0.2em] mb-4 md:mb-8 uppercase">{ev.eventType}</span>
+                                                    <p className="text-amber-100/80 text-base md:text-xl leading-relaxed font-serif italic">{ev.description}</p>
+                                                    {ev.imageUrl && <img src={ev.imageUrl} className="mt-6 md:mt-8 w-full h-40 md:h-64 object-cover rounded-sm border-2 md:border-4 border-[#1e1a16] opacity-80 md:opacity-60 md:hover:opacity-100 transition-all duration-700" />}
                                                 </div>
                                             </div>
                                         </div>
@@ -363,91 +368,95 @@
                             </div>
                         )}
 
-                        {/* 錄入按鈕 (僅管理層可見) */}
+                        {/* 錄入按鈕 (管理層才看得到，手機版縮小) */}
                         {isManagement && (
-                            <button onClick={() => setIsAdding(true)} className="fixed bottom-20 right-20 w-24 h-24 md:w-32 md:h-32 bg-[#0c3b28] text-emerald-50 border-4 border-emerald-800 shadow-[0_30px_80px_rgba(0,80,40,0.8)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[100] group rounded-full"><div className="text-center flex flex-col items-center"><Plus size={44} className="group-hover:rotate-180 transition-transform duration-700" /><div className="text-[10px] font-black tracking-[0.6em] uppercase mt-1.5">錄入</div></div></button>
+                            <button onClick={() => setIsAdding(true)} className="fixed bottom-10 right-6 md:bottom-20 md:right-20 w-16 h-16 md:w-32 md:h-32 bg-[#0c3b28] text-emerald-50 border-4 md:border-8 border-emerald-800 shadow-[0_20px_50px_rgba(0,80,40,0.8)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[100] group rounded-full"><div className="text-center flex flex-col items-center"><Plus size={24} className="md:w-11 md:h-11 group-hover:rotate-180 transition-transform duration-700" /><div className="text-[8px] md:text-[10px] font-black tracking-[0.2em] uppercase mt-1">錄入</div></div></button>
                         )}
                     </main>
 
                     {/* Login Modal */}
                     {showLogin && (
-                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-8 bg-black/95 backdrop-blur-3xl">
-                            <div className="bg-[#1a1714] border-[4px] border-amber-800/40 w-full max-w-lg shadow-2xl rounded-sm p-12">
-                                <div className="flex justify-between items-center mb-10 border-b-2 border-amber-900/30 pb-6 text-amber-500">
-                                    <h2 className="text-3xl font-black tracking-[0.5em] flex items-center gap-4"><Lock size={32}/> 管理山門</h2>
-                                    <button onClick={() => setShowLogin(false)}><X size={32}/></button>
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-3xl">
+                            <div className="bg-[#1a1714] border-2 md:border-[4px] border-amber-800/40 w-full max-w-lg shadow-2xl rounded-sm p-6 md:p-12">
+                                <div className="flex justify-between items-center mb-8 border-b border-amber-900/30 pb-4 text-amber-500">
+                                    <h2 className="text-xl md:text-3xl font-black tracking-[0.3em] flex items-center gap-3"><Lock size={24}/> 管理山門</h2>
+                                    <button onClick={() => setShowLogin(false)}><X size={24}/></button>
                                 </div>
-                                <form onSubmit={handleLogin} className="space-y-10">
-                                    <div className="space-y-4">
-                                        <label className="text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-3"><User size={16}/> 掌門密令 (Email)</label>
-                                        <input type="email" required className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-xl outline-none focus:border-amber-500 text-amber-50" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
+                                <form onSubmit={handleLogin} className="space-y-6 md:space-y-10">
+                                    <div className="space-y-2 md:space-y-4">
+                                        <label className="text-xs md:text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-2"><User size={14}/> 掌門密令 (Email)</label>
+                                        <input type="email" required className="w-full bg-black/40 border-b border-amber-900/20 p-2 md:p-4 text-lg outline-none focus:border-amber-500 text-amber-50" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                                     </div>
-                                    <div className="space-y-4">
-                                        <label className="text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-3"><Key size={16}/> 門派信物 (密碼)</label>
-                                        <input type="password" required className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-xl outline-none focus:border-amber-500 text-amber-50" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
+                                    <div className="space-y-2 md:space-y-4">
+                                        <label className="text-xs md:text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-2"><Key size={14}/> 門派信物 (密碼)</label>
+                                        <input type="password" required className="w-full bg-black/40 border-b border-amber-900/20 p-2 md:p-4 text-lg outline-none focus:border-amber-500 text-amber-50" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
                                     </div>
-                                    <button type="submit" className="w-full py-6 bg-amber-900/40 text-amber-300 font-black tracking-[1em] border-2 border-amber-700 hover:bg-amber-700 hover:text-white transition-all">喚醒權限</button>
+                                    <button type="submit" className="w-full py-4 md:py-6 bg-amber-900/40 text-amber-300 font-black tracking-[0.5em] border border-amber-700 hover:bg-amber-700 hover:text-white transition-all">喚醒權限</button>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* Editor Modal (只有管理層能觸發) */}
+                    {/* Editor Modal - 彈窗手機版優化 */}
                     {isAdding && isManagement && (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-black/98 backdrop-blur-3xl text-left">
-                            <div className="bg-[#1e1b18] border-[5px] border-amber-500/40 w-full max-w-5xl shadow-2xl rounded-sm p-10 md:p-16 max-h-[90vh] overflow-y-auto custom-scrollbar">
-                                <div className="flex justify-between items-center mb-14 border-b-4 border-amber-500/30 pb-10 text-amber-400">
-                                    <h2 className="text-4xl md:text-6xl font-black tracking-[1em] uppercase flex items-center gap-10"><Compass size={56} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
-                                    <button onClick={resetForm} className="hover:text-white transition-all hover:rotate-90 duration-500"><X size={64} /></button>
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 md:p-8 bg-black/98 backdrop-blur-3xl text-left">
+                            <div className="bg-[#1e1b18] border-2 md:border-[5px] border-amber-500/40 w-full max-w-5xl shadow-[0_0_150px_rgba(0,0,0,1)] rounded-sm p-6 md:p-16 max-h-[95vh] overflow-y-auto custom-scrollbar">
+                                <div className="flex justify-between items-center mb-8 border-b-2 border-amber-500/30 pb-6 text-amber-400">
+                                    <h2 className="text-xl md:text-6xl font-black tracking-[0.2em] md:tracking-[1em] uppercase flex items-center gap-4"><Compass size={24} className="md:w-14 md:h-14 animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
+                                    <button onClick={resetForm} className="hover:text-white transition-all hover:rotate-90 duration-500"><X size={32} /></button>
                                 </div>
-                                <form onSubmit={handleSubmit} className="space-y-12">
+                                <form onSubmit={handleSubmit} className="space-y-8 md:space-y-12">
                                     {activeTab === 'members' ? (
                                         <>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none focus:border-amber-400 text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none focus:border-amber-400 text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">傳 承 代 數</label><input type="number" className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none text-amber-50" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div>
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">傳 承 代 數</label><input type="number" className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                                             </div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
-                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none text-amber-50" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
+                                                <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-50" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                                             </div>
-                                            <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none text-amber-50" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                            <div className="space-y-2"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-50" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                                         </>
                                     )}
-                                    <div className="space-y-6"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black block">江 湖 畫 像 (本地或網址)</label><div className="flex flex-col md:flex-row gap-8 p-6 border-2 border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-3 text-lg italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-12 py-4 border-2 border-amber-500/40 text-base font-black uppercase text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
-                                    <div className="space-y-6"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">誌 異 / 詳 情</label><textarea rows="5" className="w-full bg-black/50 border-2 border-amber-500/20 p-8 text-xl italic font-serif leading-[2.4] outline-none focus:border-amber-400 text-amber-50" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-                                    <button type="submit" disabled={isSaving} className={`w-full py-8 bg-[#a00000] text-[#fff6d1] font-black tracking-[2.5em] border-6 border-double border-[#700000] shadow-2xl transition-all transform text-3xl uppercase ${isSaving ? 'opacity-50' : 'hover:bg-[#800000] hover:-translate-y-2'}`}>{isSaving ? '凝 氣 成 書...' : '落 筆 成 書'}</button>
+                                    <div className="space-y-4"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black block">江 湖 畫 像 (本地或網址)</label><div className="flex flex-col md:flex-row gap-4 p-4 border border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-2 text-sm italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-6 py-3 border border-amber-500/40 text-xs font-black uppercase text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
+                                    <div className="space-y-4"><label className="text-xs text-amber-50 uppercase tracking-[0.2em] font-black">誌 異 / 詳 情</label><textarea rows="5" className="w-full bg-black/50 border border-amber-500/20 p-4 md:p-8 text-lg md:text-xl italic font-serif leading-[2] md:leading-[2.4] outline-none focus:border-amber-400 text-amber-50" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+                                    <button type="submit" disabled={isSaving} className={`w-full py-4 md:py-8 bg-[#a00000] text-[#fff6d1] font-black tracking-[1em] md:tracking-[2.5em] border-4 md:border-6 border-double border-[#700000] shadow-2xl transition-all transform text-xl md:text-3xl uppercase ${isSaving ? 'opacity-50' : 'hover:bg-[#800000] hover:-translate-y-2'}`}>{isSaving ? '凝 氣 成 書...' : '落 筆 成 書'}</button>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* Footer */}
-                    <footer className="max-w-[95rem] mx-auto mt-72 px-12 pb-60 text-center relative z-10 w-full flex flex-col items-center">
-                        <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/80 to-transparent mb-16" />
-                        <div className="w-full flex justify-center overflow-visible mb-12"><p className="text-4xl md:text-5xl lg:text-6xl font-black text-amber-400 font-serif sub-spacing pl-[1.5em] glow-text whitespace-nowrap">江 湖 路 遠 · 終 會 在 遇</p></div>
-                        <p className="text-lg md:text-xl tracking-[0.8em] mb-12 uppercase font-black text-amber-500">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
+                    {/* Footer - 極致手機版防溢出校準 */}
+                    <footer className="max-w-[95rem] mx-auto mt-40 md:mt-72 px-4 md:px-12 pb-40 text-center relative z-10 w-full flex flex-col items-center">
+                        <div className="h-[2px] md:h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/80 to-transparent mb-12 md:mb-16" />
+                        <div className="w-full flex justify-center overflow-hidden mb-8 md:mb-12">
+                            <p className="text-2xl md:text-5xl lg:text-6xl font-black text-amber-400 font-serif sub-spacing glow-text break-words leading-tight">
+                                江 湖 路 遠 · 終 會 再 遇
+                            </p>
+                        </div>
+                        <p className="text-sm md:text-xl tracking-[0.2em] md:tracking-[0.8em] mb-8 md:mb-12 uppercase font-black text-amber-500 px-4">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         
-                        <div className="flex flex-col md:flex-row items-center gap-10 p-8 border-2 border-amber-400/30 bg-amber-950/20 rounded-lg">
-                            <div className="flex items-center gap-6">
-                                <div className={`w-5 h-5 rounded-full ${user ? 'bg-emerald-400 shadow-[0_0_20px_#34d399]' : 'bg-red-500 shadow-[0_0_20px_#ef4444]'}`} />
-                                <div className="text-amber-400 text-xs md:text-base tracking-[0.5em] font-black">俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}</div>
+                        <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 p-6 md:p-8 border-2 border-amber-400/30 bg-amber-950/20 rounded-lg w-full max-w-fit mx-4">
+                            <div className="flex items-center gap-4 md:gap-6">
+                                <div className={`w-4 h-4 md:w-5 md:h-5 rounded-full ${user ? 'bg-emerald-400 shadow-[0_0_15px_#34d399]' : 'bg-red-500 shadow-[0_0_15px_#ef4444]'}`} />
+                                <div className="text-amber-400 text-[10px] md:text-base tracking-[0.1em] md:tracking-[0.5em] font-black truncate max-w-[200px] md:max-w-none">俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}</div>
                             </div>
                             
-                            <div className="h-8 w-[1px] bg-amber-900/50 hidden md:block"></div>
+                            <div className="h-[1px] w-12 md:h-8 md:w-[1px] bg-amber-900/50"></div>
                             
                             <div className="flex items-center gap-6">
                                 {isManagement ? (
-                                    <button onClick={handleLogout} className="text-red-500 hover:text-red-300 transition-colors flex items-center gap-3 text-sm font-black tracking-widest uppercase"><LogOut size={20}/> 卸下權限</button>
+                                    <button onClick={handleLogout} className="text-red-500 hover:text-red-300 transition-colors flex items-center gap-2 md:gap-3 text-xs md:text-sm font-black tracking-widest uppercase"><LogOut size={18}/> 卸下權限</button>
                                 ) : (
-                                    <button onClick={() => setShowLogin(true)} className="text-amber-700 hover:text-amber-500 transition-colors flex items-center gap-3 text-sm font-black tracking-widest uppercase"><Key size={20}/> 掌門印信</button>
+                                    <button onClick={() => setShowLogin(true)} className="text-amber-700 hover:text-amber-500 transition-colors flex items-center gap-2 md:gap-3 text-xs md:text-sm font-black tracking-widest uppercase"><Key size={18}/> 掌門印信</button>
                                 )}
                             </div>
                         </div>

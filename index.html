@@ -25,10 +25,9 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #78350f; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #b91c1c; }
-        .animate-spin-slow { animation: spin 15s linear infinite; }
+        .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        /* 標題字距平衡 - 縮減係數以防斷行 */
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
         .sub-spacing { letter-spacing: 0.8em; text-indent: 0.8em; }
 
@@ -39,6 +38,7 @@
         
         .glow-text { text-shadow: 0 0 15px rgba(251, 191, 36, 0.7), 0 0 30px rgba(251, 191, 36, 0.4); }
         .card-glow { box-shadow: 0 0 30px rgba(120, 53, 15, 0.2); }
+        .timeline-line { background: linear-gradient(to bottom, transparent, #78350f 15%, #78350f 85%, transparent); }
     </style>
 </head>
 <body class="custom-scrollbar overflow-x-hidden">
@@ -49,93 +49,125 @@
         import ReactDOM from 'react-dom/client';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js';
         import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js';
         
         import { 
             Plus, Edit2, Trash2, X, Ghost, Upload, 
-            BookOpen, Feather, Shield, Crosshair, History, Compass, AlertTriangle 
+            BookOpen, Feather, Shield, Crosshair, History, Compass, AlertTriangle,
+            Scroll, Landmark, Key, LogOut, Lock, User
         } from 'https://esm.sh/lucide-react@0.284.0?external=react';
 
         // ==========================================
         // 【靈脈核心】
         // ==========================================
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
-                apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCc1LE2T-w",
-                authDomain: "yin-quan-legacy.firebaseapp.com",
-                projectId: "yin-quan-legacy",
-                storageBucket: "yin-quan-legacy.firebasestorage.app",
-                messagingSenderId: "458932829125",
-                appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
-                measurementId: "G-S5X670YKCT"
-            };
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkb-GkyQ8vtrv2XXRNN5cZmNCc1LE2T-w",
+            authDomain: "yin-quan-legacy.firebaseapp.com",
+            projectId: "yin-quan-legacy",
+            storageBucket: "yin-quan-legacy.firebasestorage.app",
+            messagingSenderId: "458932829125",
+            appId: "1:458932829125:web:9f078eb93d9e07e73029ac",
+            measurementId: "G-S5X670YKCT"
+        };
         
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "yin-quan-legacy"; 
+        const appId = "yin-quan-legacy"; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
         const CLASSES = ['碎夢', '龍吟', '血河', '神相', '九靈', '素問', '鐵衣', '玄機', '荒羽', '鴻音', '潮光'];
         const POSITIONS = ['幫眾', '堂主', '副堂主', '宴者', '雅匠', '文士', '接待', '軍師', '當家'];
+        const EVENT_TYPES = ['幫會戰鬥', '江湖盟約', '周年慶典', '勢力更迭', '成員聚首', '其他大事'];
 
         function App() {
             const [user, setUser] = useState(null);
+            const [activeTab, setActiveTab] = useState('members');
             const [members, setMembers] = useState([]);
+            const [events, setEvents] = useState([]);
+            
+            // UI States
             const [isAdding, setIsAdding] = useState(false);
             const [isSaving, setIsSaving] = useState(false);
             const [editingId, setEditingId] = useState(null);
             const [loading, setLoading] = useState(true);
+            const [showLogin, setShowLogin] = useState(false);
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
             const [expandedBatches, setExpandedBatches] = useState({});
             const [isCompressing, setIsCompressing] = useState(false);
-            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+            
+            // Login States
+            const [loginEmail, setLoginEmail] = useState('');
+            const [loginPass, setLoginPass] = useState('');
+
             const fileInputRef = useRef(null);
 
             const [formData, setFormData] = useState({
                 name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
+                date: '', eventType: '幫會戰鬥', title: ''
             });
 
+            // 判斷是否為管理層 (非匿名使用者即視為管理層)
+            const isManagement = useMemo(() => user && !user.isAnonymous, [user]);
+
             useEffect(() => {
-                const initAuth = async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    if (!u) {
+                        try {
                             await signInAnonymously(auth);
-                        }
-                    } catch (err) {
-                        console.error("認證失敗:", err);
+                        } catch (err) { console.error("認證失敗:", err); }
+                    } else {
+                        setUser(u);
                         setLoading(false);
                     }
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    if (u) setUser(u);
                 });
                 return () => unsubscribe();
             }, []);
 
+            // 數據同步：俠客傳
             useEffect(() => {
                 if (!user) return;
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
-                const unsubscribe = onSnapshot(colRef, 
-                    (snapshot) => {
-                        const list = [];
-                        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
-                        list.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
-                        setMembers(list);
-                        setLoading(false);
-                        const expandMap = {};
-                        list.forEach(m => { if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true; });
-                        setExpandedBatches(prev => ({ ...expandMap, ...prev }));
-                    }, 
-                    (err) => {
-                        console.error("讀取失敗:", err);
-                        setLoading(false);
-                    }
-                );
+                const unsubscribe = onSnapshot(colRef, (snapshot) => {
+                    const list = [];
+                    snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+                    list.sort((a, b) => (parseInt(a.batch) || 1) - (parseInt(b.batch) || 1));
+                    setMembers(list);
+                    const expandMap = {};
+                    list.forEach(m => { if (expandedBatches[m.batch] === undefined) expandMap[m.batch] = true; });
+                    setExpandedBatches(prev => ({ ...expandMap, ...prev }));
+                });
                 return () => unsubscribe();
             }, [user]);
+
+            // 數據同步：編年史
+            useEffect(() => {
+                if (!user) return;
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+                const unsubscribe = onSnapshot(colRef, (snapshot) => {
+                    const list = [];
+                    snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+                    list.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    setEvents(list);
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                try {
+                    await signInWithEmailAndPassword(auth, loginEmail, loginPass);
+                    setShowLogin(false);
+                    setLoginEmail('');
+                    setLoginPass('');
+                } catch (err) {
+                    alert("身分驗證失敗，莫非是假冒的管理層？");
+                }
+            };
+
+            const handleLogout = async () => {
+                await signOut(auth);
+                window.location.reload();
+            };
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -162,45 +194,38 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (isSaving) return;
-                let activeUser = auth.currentUser;
-                if (!activeUser) {
-                    try {
-                        const result = await signInAnonymously(auth);
-                        activeUser = result.user;
-                        setUser(activeUser);
-                    } catch (err) {
-                        alert("靈脈未通，請確認認證。");
-                        return;
-                    }
-                }
+                if (!isManagement || isSaving) return;
                 setIsSaving(true);
                 const { id, ...dataToSave } = formData;
                 try {
-                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                    const collectionName = activeTab === 'members' ? 'members' : 'events';
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                     if (editingId) {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingId);
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
                         await updateDoc(docRef, dataToSave);
                     } else {
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString() });
                     }
                     resetForm();
-                } catch (err) {
-                    alert("落筆失敗！");
-                } finally { setIsSaving(false); }
+                } catch (err) { alert("落筆失敗！權限不足。"); } 
+                finally { setIsSaving(false); }
             };
 
             const executeDelete = async (id) => {
-                if (!auth.currentUser) return;
+                if (!isManagement) return;
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', id);
+                    const collectionName = activeTab === 'members' ? 'members' : 'events';
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
                     await deleteDoc(docRef);
                     setConfirmDeleteId(null);
                 } catch (e) { alert("抹除失敗"); }
             };
 
             const resetForm = () => {
-                setFormData({ name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '' });
+                setFormData({ 
+                    name: '', period: '', imageUrl: '', jobClass: '碎夢', batch: 1, position: '幫眾', description: '',
+                    date: '', eventType: '幫會戰鬥', title: ''
+                });
                 setEditingId(null);
                 setIsAdding(false);
             };
@@ -208,8 +233,9 @@
             const groupedMembers = useMemo(() => {
                 const g = {};
                 members.forEach(m => {
-                    if (!g[m.batch]) g[m.batch] = [];
-                    g[m.batch].push(m);
+                    const b = m.batch || 1;
+                    if (!g[b]) g[b] = [];
+                    g[b].push(m);
                 });
                 return g;
             }, [members]);
@@ -223,8 +249,24 @@
 
             return (
                 <div className="relative pb-60">
-                    {/* Header - 校準後的震撼大標 */}
-                    <header className="relative min-h-[85vh] flex flex-col items-center justify-center overflow-hidden border-b-4 border-amber-500/20 py-24 bg-gradient-to-b from-[#201a14] to-[#050505]">
+                    {/* Navigation */}
+                    <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/80 backdrop-blur-md border-b border-amber-900/30 flex justify-center p-4 gap-8">
+                        <button 
+                            onClick={() => { setActiveTab('members'); window.scrollTo(0,0); }}
+                            className={`flex items-center gap-4 px-10 py-3 text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'members' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
+                        >
+                            <Scroll size={24} /> 俠客傳承
+                        </button>
+                        <button 
+                            onClick={() => { setActiveTab('events'); window.scrollTo(0,0); }}
+                            className={`flex items-center gap-4 px-10 py-3 text-xl font-black transition-all rounded-sm border-2 ${activeTab === 'events' ? 'bg-amber-900/40 text-amber-300 border-amber-500 shadow-lg glow-text' : 'text-amber-800 border-transparent hover:text-amber-500'}`}
+                        >
+                            <Landmark size={24} /> 大事編年
+                        </button>
+                    </nav>
+
+                    {/* Header */}
+                    <header className="relative min-h-[85vh] flex flex-col items-center justify-center overflow-hidden border-b-4 border-amber-500/20 py-32 bg-gradient-to-b from-[#201a14] to-[#050505] mt-16">
                         <div className="flex justify-center mb-16">
                             <div className="relative p-8">
                                 <div className="absolute inset-0 border-4 border-amber-400/50 rotate-45 animate-pulse" />
@@ -232,155 +274,188 @@
                                 <BookOpen size={56} className="text-amber-400 relative z-10" />
                             </div>
                         </div>
-                        
-                        <div className="w-full flex justify-center items-center mb-12 px-6">
-                            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-amber-400 title-spacing whitespace-nowrap drop-shadow-[0_15px_40px_rgba(0,0,0,1)] text-center pl-[0.5em] glow-text select-none">
-                                隱泉水榭·幫會傳承錄
-                            </h1>
-                        </div>
-                        
-                        <div className="flex flex-col items-center gap-12 w-full px-8 text-center">
-                            <div className="flex items-center justify-center gap-6 md:gap-12 whitespace-nowrap w-full">
-                                <div className="hidden sm:block h-[2px] flex-1 max-w-[100px] bg-gradient-to-r from-transparent to-amber-500" />
-                                <p className="text-amber-500 font-black tracking-[1em] text-lg md:text-2xl uppercase italic sub-spacing pl-[0.8em] drop-shadow-md">歲 月 忽 已 晚 · 忠 義 永 留 芳</p>
-                                <div className="hidden sm:block h-[1px] flex-1 max-w-[100px] bg-gradient-to-l from-transparent to-amber-500" />
-                            </div>
-                            <div className="max-w-4xl bg-amber-950/30 border-x-4 border-amber-500/40 p-8 backdrop-blur-xl mx-auto rounded-sm shadow-xl">
-                                <p className="text-amber-300 text-sm md:text-lg leading-relaxed tracking-[0.2em] font-black italic font-serif">我們為休閒至情義幫，本譜只會依照單獨幾位老人的記憶，錄入有與幫會交流熱絡、曾共同遊玩，以及幫戰共同奮戰之人。</p>
-                            </div>
-                        </div>
+                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-amber-400 title-spacing drop-shadow-[0_15px_40px_rgba(0,0,0,1)] text-center pl-[0.5em] glow-text mb-12">
+                            {activeTab === 'members' ? '隱泉水榭·幫會傳承錄' : '隱泉水榭·大事編年史'}
+                        </h1>
+                        <p className="text-amber-500 font-black tracking-[1em] text-lg md:text-2xl uppercase italic sub-spacing pl-[0.8em] drop-shadow-md">
+                            {activeTab === 'members' ? '歲 月 忽 已 晚 · 忠 義 永 留 芳' : '興 衰 皆 史 冊 · 往 事 總 留 痕'}
+                        </p>
                     </header>
 
-                    <main className="max-w-[90rem] mx-auto px-10 -mt-32 relative z-30 pb-60 text-center">
-                        <div className="space-y-48 inline-block w-full">
-                            {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
-                                <section key={batch} className="relative pt-24 w-full text-center">
-                                    <div className="flex justify-center mb-24 relative z-[40]">
-                                        <div className="relative group">
-                                            <div className="bg-[#8b0000] text-[#fffdeb] px-12 py-6 flex flex-col items-center justify-center rounded-sm shadow-[0_30px_60px_rgba(0,0,0,1)] border-[5px] border-double border-[#600000] transform transition-all group-hover:scale-110">
-                                                <div className="text-xs opacity-90 tracking-[0.3em] mb-2 uppercase font-black text-amber-200">江湖世代</div>
+                    <main className="max-w-[95rem] mx-auto px-10 -mt-32 relative z-30 pb-60 text-center">
+                        
+                        {/* 俠客傳承 */}
+                        {activeTab === 'members' && (
+                            <div className="space-y-48 inline-block w-full">
+                                {Object.entries(groupedMembers).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([batch, batchMembers]) => (
+                                    <section key={batch} className="relative pt-24 w-full">
+                                        <div className="flex justify-center mb-24">
+                                            <div className="bg-[#8b0000] text-[#fffdeb] px-12 py-6 border-[5px] border-double border-[#600000] shadow-[0_30px_60px_rgba(0,0,0,1)]">
+                                                <div className="text-xs opacity-90 tracking-[0.3em] font-black text-amber-200">江湖世代</div>
                                                 <div className="text-6xl font-black glow-text">第 {batch} 批</div>
-                                                <div className="text-sm opacity-100 mt-2 font-serif tracking-[0.5em] text-amber-200">傳承錄</div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    {expandedBatches[batch] && (
-                                        <div className="space-y-40 relative mt-20 text-left">
-                                            <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-400/30 via-amber-400/5 to-transparent hidden md:block" />
+                                        <div className="space-y-40 text-left">
                                             {batchMembers.map((member, idx) => (
-                                                <div key={member.id} className={`flex flex-col md:flex-row items-center md:items-start gap-20 ${idx % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'} relative z-10`}>
-                                                    <div className="w-full md:w-[65%] group relative">
-                                                        <div className="bg-[#14110e] p-10 md:p-14 border-x-4 border-amber-700/30 shadow-2xl relative overflow-hidden rounded-xl group-hover:border-amber-400 transition-all duration-700 card-glow">
-                                                            <div className="absolute -bottom-16 -right-16 text-[12rem] opacity-[0.03] pointer-events-none font-black text-amber-400 italic select-none">{member.jobClass}</div>
-                                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b-4 border-amber-500/20 pb-10 relative z-10">
-                                                                <div className="mb-6 md:mb-0">
-                                                                    <div className="flex items-center gap-8 mb-4">
-                                                                        <h3 className="text-5xl md:text-6xl font-black text-amber-50 tracking-widest glow-text drop-shadow-xl">{member.name}</h3>
-                                                                        <span className="bg-[#b91c1c] text-white text-[10px] px-4 py-1.5 font-black tracking-[0.4em] shadow-xl border border-amber-400/20 uppercase">世代 {member.batch}</span>
-                                                                    </div>
-                                                                    <div className="flex flex-wrap items-center gap-8 text-amber-400 font-black tracking-[0.4em] text-base uppercase">
-                                                                        <span className="flex items-center gap-3"><Shield size={20} className="text-amber-600" />曾任：{member.position}</span>
-                                                                        <span className="flex items-center gap-3"><Crosshair size={20} className="text-amber-600" />流派：{member.jobClass}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex gap-6">
-                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3.5 bg-amber-500/10 hover:bg-amber-400 hover:text-black rounded-lg transition-all shadow-xl border-2 border-amber-500/20"><Edit2 size={24}/></button>
-                                                                    <div className="relative">
-                                                                        {confirmDeleteId === member.id && (
-                                                                            <div className="absolute bottom-full right-0 mb-4 flex flex-col items-end gap-3 animate-in slide-in-from-bottom-2 duration-200">
-                                                                                <div className="bg-[#c00000] text-white p-4 text-xs font-black tracking-widest whitespace-nowrap border-4 border-[#800000] shadow-3xl rounded-md">確定抹除這段記憶？</div>
-                                                                                <div className="flex gap-3">
-                                                                                    <button onClick={() => executeDelete(member.id)} className="bg-red-500 text-white px-5 py-2 text-[10px] font-black hover:bg-red-400 transition-colors shadow-2xl">確定</button>
-                                                                                    <button onClick={() => setConfirmDeleteId(null)} className="bg-slate-700 text-white px-5 py-2 text-[10px] font-black hover:bg-slate-600 transition-colors shadow-2xl">取消</button>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                        <button onClick={() => setConfirmDeleteId(member.id)} className={`p-3.5 rounded-lg transition-all border-2 ${confirmDeleteId === member.id ? 'bg-red-600 border-red-400 text-white' : 'bg-amber-500/5 border-amber-500/10 hover:bg-red-600 hover:text-white'}`}><Trash2 size={24}/></button>
-                                                                    </div>
+                                                <div key={member.id} className={`flex flex-col md:flex-row items-center md:items-start gap-20 ${idx % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'}`}>
+                                                    <div className="w-full md:w-[65%] bg-[#14110e] p-10 md:p-14 border-x-4 border-amber-700/30 rounded-xl card-glow relative overflow-hidden">
+                                                        <div className="absolute -bottom-16 -right-16 text-[12rem] opacity-[0.03] font-black text-amber-400 italic select-none">{member.jobClass}</div>
+                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 border-b-4 border-amber-500/20 pb-10">
+                                                            <div>
+                                                                <h3 className="text-5xl md:text-6xl font-black text-amber-50 tracking-widest glow-text mb-4">{member.name}</h3>
+                                                                <div className="flex gap-8 text-amber-400 font-black tracking-[0.4em] text-base uppercase">
+                                                                    <span><Shield className="inline mr-3" size={20}/>{member.position}</span>
+                                                                    <span><Crosshair className="inline mr-3" size={20}/>{member.jobClass}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="relative mb-12 pl-10">
-                                                                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-amber-400 via-transparent to-amber-400" />
-                                                                <p className="text-amber-50/90 text-xl md:text-2xl leading-[2.6] italic font-serif tracking-wide drop-shadow-md">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
-                                                            </div>
-                                                            <div className="text-sm text-amber-500/90 font-black uppercase tracking-[0.6em] pt-10 border-t-2 border-amber-500/10 flex items-center gap-5"><History size={20} className="text-amber-600" /> 活躍時期：{member.period || '不詳'}</div>
+                                                            {isManagement && (
+                                                                <div className="flex gap-6 mt-6 md:mt-0">
+                                                                    <button onClick={() => { setFormData(member); setEditingId(member.id); setIsAdding(true); }} className="p-3 bg-amber-500/10 hover:bg-amber-400 hover:text-black rounded-lg transition-all border-2 border-amber-500/20"><Edit2 size={24}/></button>
+                                                                    <button onClick={() => setConfirmDeleteId(member.id)} className="p-3 bg-amber-500/5 hover:bg-red-600 rounded-lg transition-all border-2 border-amber-500/10"><Trash2 size={24}/></button>
+                                                                </div>
+                                                            )}
                                                         </div>
+                                                        <p className="text-amber-50/90 text-xl md:text-2xl leading-[2.6] italic font-serif mb-12 pl-10 border-l-4 border-amber-500/30">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
+                                                        <div className="text-sm text-amber-500 font-black uppercase tracking-[0.6em] flex items-center gap-5 border-t-2 border-amber-500/10 pt-10"><History size={20}/> 活躍時期：{member.period || '不詳'}</div>
                                                     </div>
-                                                    <div className="w-full md:w-[35%] mt-12 md:mt-20">
-                                                        <div className="aspect-[3/4] bg-black border-[16px] border-[#1e1a16] shadow-[0_60px_120px_-40px_rgba(0,0,0,1)] relative overflow-hidden rounded-sm group/img">
-                                                            {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-1000 scale-110 group-hover:scale-100" alt={member.name} /> : <div className="w-full h-full flex flex-col items-center justify-center text-amber-400/20"><Ghost size={120} className="mb-8 opacity-30" /><span className="text-lg tracking-[1.5em] font-black uppercase text-center px-4">影跡全無</span></div>}
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-80" />
-                                                        </div>
+                                                    <div className="w-full md:w-[35%] aspect-[3/4] bg-black border-[16px] border-[#1e1a16] shadow-xl overflow-hidden rounded-sm relative">
+                                                        {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-1000" /> : <div className="h-full flex flex-col items-center justify-center text-amber-900/10"><Ghost size={120}/><span className="text-lg tracking-[1.5em] font-black">影跡全無</span></div>}
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
-                                    )}
-                                </section>
-                            ))}
-                        </div>
-                        <button onClick={() => setIsAdding(true)} className="fixed bottom-20 right-20 w-24 h-24 md:w-32 md:h-32 bg-[#0c3b28] text-emerald-50 border-4 border-emerald-800 shadow-[0_30px_80px_rgba(0,80,40,0.8)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[100] group rounded-full"><div className="text-center flex flex-col items-center"><Plus size={44} className="group-hover:rotate-180 transition-transform duration-700" /><div className="text-[10px] font-black tracking-[0.6em] uppercase mt-1.5">錄入</div></div></button>
+                                    </section>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* 大事編年 */}
+                        {activeTab === 'events' && (
+                            <div className="relative max-w-6xl mx-auto py-24 px-6 text-left">
+                                <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[4px] timeline-line -translate-x-1/2" />
+                                {events.length === 0 ? (
+                                    <p className="text-center text-3xl font-black text-amber-800 tracking-[1em] py-40">史 冊 空 白 · 待 君 揮 毫</p>
+                                ) : (
+                                    events.map((ev, idx) => (
+                                        <div key={ev.id} className={`relative flex flex-col md:flex-row items-center justify-between mb-32 w-full ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
+                                            <div className="hidden md:block w-[45%]" />
+                                            <div className="absolute left-8 md:left-1/2 -translate-x-1/2 w-12 h-12 bg-[#8b0000] border-4 border-amber-500 rounded-full z-10 shadow-[0_0_20px_rgba(245,158,11,0.5)] flex items-center justify-center"><Landmark size={20} className="text-amber-100" /></div>
+                                            <div className="w-full md:w-[45%] pl-20 md:pl-0">
+                                                <div className="bg-[#14110e] p-10 border-x-4 border-amber-700/30 rounded-xl card-glow relative group">
+                                                    <div className="flex justify-between items-start mb-6">
+                                                        <span className="text-amber-500 font-black text-2xl tracking-[0.2em] bg-amber-950/30 px-6 py-2 border border-amber-500/20">{ev.date}</span>
+                                                        {isManagement && (
+                                                            <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => { setFormData(ev); setEditingId(ev.id); setIsAdding(true); }} className="p-2 text-amber-600 hover:text-amber-400"><Edit2 size={20}/></button>
+                                                                <button onClick={() => executeDelete(ev.id)} className="p-2 text-amber-900 hover:text-red-600"><Trash2 size={20}/></button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <h3 className="text-4xl md:text-5xl font-black text-amber-50 mb-6 glow-text tracking-widest">{ev.title}</h3>
+                                                    <span className="inline-block bg-[#600000] text-amber-100 text-xs px-4 py-1 font-bold tracking-[0.3em] mb-8 uppercase">{ev.eventType}</span>
+                                                    <p className="text-amber-100/80 text-xl leading-relaxed font-serif italic">{ev.description}</p>
+                                                    {ev.imageUrl && <img src={ev.imageUrl} className="mt-8 w-full h-64 object-cover rounded-sm border-4 border-[#1e1a16] opacity-60 hover:opacity-100 transition-all duration-700" />}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {/* 錄入按鈕 (僅管理層可見) */}
+                        {isManagement && (
+                            <button onClick={() => setIsAdding(true)} className="fixed bottom-20 right-20 w-24 h-24 md:w-32 md:h-32 bg-[#0c3b28] text-emerald-50 border-4 border-emerald-800 shadow-[0_30px_80px_rgba(0,80,40,0.8)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-[100] group rounded-full"><div className="text-center flex flex-col items-center"><Plus size={44} className="group-hover:rotate-180 transition-transform duration-700" /><div className="text-[10px] font-black tracking-[0.6em] uppercase mt-1.5">錄入</div></div></button>
+                        )}
                     </main>
 
-                    {/* Modal */}
-                    {isAdding && (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-black/98 backdrop-blur-3xl text-left">
-                            <div className="bg-[#1e1b18] border-[5px] border-amber-500/40 w-full max-w-5xl shadow-[0_0_150px_rgba(0,0,0,1)] rounded-sm p-10 md:p-16 max-h-[90vh] overflow-y-auto custom-scrollbar">
-                                <div className="flex justify-between items-center mb-14 border-b-4 border-amber-500/30 pb-10 text-amber-400">
-                                    <h2 className="text-3xl md:text-5xl font-black tracking-[1em] uppercase flex items-center gap-8"><Compass size={56} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
-                                    <button onClick={resetForm} className="hover:text-white transition-all hover:rotate-90 duration-500"><X size={64} /></button>
+                    {/* Login Modal */}
+                    {showLogin && (
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-8 bg-black/95 backdrop-blur-3xl">
+                            <div className="bg-[#1a1714] border-[4px] border-amber-800/40 w-full max-w-lg shadow-2xl rounded-sm p-12">
+                                <div className="flex justify-between items-center mb-10 border-b-2 border-amber-900/30 pb-6 text-amber-500">
+                                    <h2 className="text-3xl font-black tracking-[0.5em] flex items-center gap-4"><Lock size={32}/> 管理山門</h2>
+                                    <button onClick={() => setShowLogin(false)}><X size={32}/></button>
                                 </div>
-                                <form onSubmit={handleSubmit} className="space-y-12">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16">
-                                        <div className="space-y-4"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-                                        <div className="space-y-4"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none focus:border-amber-400 cursor-pointer font-black text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                <form onSubmit={handleLogin} className="space-y-10">
+                                    <div className="space-y-4">
+                                        <label className="text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-3"><User size={16}/> 掌門密令 (Email)</label>
+                                        <input type="email" required className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-xl outline-none focus:border-amber-500 text-amber-50" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                                     </div>
-                                    <div className="space-y-6"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black block text-center sm:text-left">江 湖 畫 像 (本地畫像)</label><div className="flex flex-col md:flex-row gap-8 p-6 border-2 border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-3 text-lg italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-12 py-4 border-2 border-amber-500/40 text-base font-black uppercase hover:bg-amber-500/30 transition-all text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16">
-                                        <div className="space-y-4"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">傳 承 代 數</label><input type="number" min="1" className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 font-black" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value) || 1})} /></div>
-                                        <div className="space-y-4"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none focus:border-amber-400 cursor-pointer font-black text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                    <div className="space-y-4">
+                                        <label className="text-sm text-amber-700 font-black tracking-widest uppercase flex items-center gap-3"><Key size={16}/> 門派信物 (密碼)</label>
+                                        <input type="password" required className="w-full bg-black/40 border-b-2 border-amber-900/20 p-4 text-xl outline-none focus:border-amber-500 text-amber-50" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
                                     </div>
-                                    <div className="space-y-4"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-2xl outline-none focus:border-amber-400 text-amber-50 font-black" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div>
-                                    <div className="space-y-6"><label className="text-sm text-amber-500 uppercase tracking-[1em] font-black">江 湖 誌 異</label><textarea rows="5" className="w-full bg-black/50 border-2 border-amber-500/20 p-8 text-xl italic font-serif leading-[2.4] outline-none focus:border-amber-400 text-amber-50 shadow-inner rounded-md" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-                                    <button 
-                                        type="submit" 
-                                        disabled={isSaving}
-                                        className={`w-full py-8 bg-[#a00000] text-[#fff6d1] font-black tracking-[2.5em] border-6 border-double border-[#700000] shadow-[0_30px_70px_rgba(0,0,0,0.8)] transition-all transform text-3xl uppercase text-center ${isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#800000] hover:-translate-y-2'}`}
-                                    >
-                                        {isSaving ? '凝 氣 成 書...' : '落 筆 成 書'}
-                                    </button>
+                                    <button type="submit" className="w-full py-6 bg-amber-900/40 text-amber-300 font-black tracking-[1em] border-2 border-amber-700 hover:bg-amber-700 hover:text-white transition-all">喚醒權限</button>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* Footer - 極致修正防斷行 */}
+                    {/* Editor Modal (只有管理層能觸發) */}
+                    {isAdding && isManagement && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-black/98 backdrop-blur-3xl text-left">
+                            <div className="bg-[#1e1b18] border-[5px] border-amber-500/40 w-full max-w-5xl shadow-2xl rounded-sm p-10 md:p-16 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                                <div className="flex justify-between items-center mb-14 border-b-4 border-amber-500/30 pb-10 text-amber-400">
+                                    <h2 className="text-4xl md:text-6xl font-black tracking-[1em] uppercase flex items-center gap-10"><Compass size={56} className="animate-spin-slow" />{editingId ? '重 修 史 冊' : '新 俠 登 錄'}</h2>
+                                    <button onClick={resetForm} className="hover:text-white transition-all hover:rotate-90 duration-500"><X size={64} /></button>
+                                </div>
+                                <form onSubmit={handleSubmit} className="space-y-12">
+                                    {activeTab === 'members' ? (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none focus:border-amber-400 text-amber-50" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">傳 承 代 數</label><input type="number" className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none text-amber-50" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div>
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none text-amber-50" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none focus:border-amber-400 text-amber-50 glow-text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
+                                                <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b-2 border-amber-500/20 p-4 text-3xl outline-none text-amber-50" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                                            </div>
+                                            <div className="space-y-4"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b-2 border-amber-500/20 p-4 text-2xl outline-none text-amber-50" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                        </>
+                                    )}
+                                    <div className="space-y-6"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black block">江 湖 畫 像 (本地或網址)</label><div className="flex flex-col md:flex-row gap-8 p-6 border-2 border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-3 text-lg italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-12 py-4 border-2 border-amber-500/40 text-base font-black uppercase text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
+                                    <div className="space-y-6"><label className="text-sm text-amber-50 uppercase tracking-[1em] font-black">誌 異 / 詳 情</label><textarea rows="5" className="w-full bg-black/50 border-2 border-amber-500/20 p-8 text-xl italic font-serif leading-[2.4] outline-none focus:border-amber-400 text-amber-50" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+                                    <button type="submit" disabled={isSaving} className={`w-full py-8 bg-[#a00000] text-[#fff6d1] font-black tracking-[2.5em] border-6 border-double border-[#700000] shadow-2xl transition-all transform text-3xl uppercase ${isSaving ? 'opacity-50' : 'hover:bg-[#800000] hover:-translate-y-2'}`}>{isSaving ? '凝 氣 成 書...' : '落 筆 成 書'}</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
                     <footer className="max-w-[95rem] mx-auto mt-72 px-12 pb-60 text-center relative z-10 w-full flex flex-col items-center">
                         <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-amber-400/80 to-transparent mb-16" />
+                        <div className="w-full flex justify-center overflow-visible mb-12"><p className="text-4xl md:text-5xl lg:text-6xl font-black text-amber-400 font-serif sub-spacing pl-[1.5em] glow-text whitespace-nowrap">江 湖 路 遠 · 終 會 在 遇</p></div>
+                        <p className="text-lg md:text-xl tracking-[0.8em] mb-12 uppercase font-black text-amber-500">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
                         
-                        {/* 修正 BUG 的核心：縮減字級字距、增加寬度、絕對禁絕換行 */}
-                        <div className="w-full flex justify-center overflow-visible mb-12">
-                            <p className="text-4xl md:text-5xl lg:text-6xl font-black text-amber-400 font-serif sub-spacing pl-[1.5em] glow-text whitespace-nowrap drop-shadow-2xl">
-                                江 湖 路 遠 · 終 會 在 遇
-                            </p>
-                        </div>
-
-                        <p className="text-lg md:text-xl tracking-[0.8em] mb-6 uppercase font-black text-amber-500 text-center w-full pl-[0.8em]">《隱泉水榭幫會傳承錄》· 軍師親筆 🖋️</p>
-                        <p className="text-base md:text-lg tracking-[0.4em] font-black italic text-amber-600 text-center w-full block mb-20 opacity-100 drop-shadow-md">自古英雄如美人 · 不許人間見白頭</p>
-                        
-                        <div className="flex items-center gap-8 p-8 border-2 border-amber-400/30 bg-amber-950/20 rounded-lg shadow-2xl">
-                            <div className={`w-5 h-5 rounded-full ${user ? 'bg-emerald-400 shadow-[0_0_20px_#34d399]' : 'bg-red-500 shadow-[0_0_20px_#ef4444]'}`} />
-                            <div className="text-amber-400 text-xs md:text-base tracking-[0.5em] uppercase font-black">
-                                俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}
+                        <div className="flex flex-col md:flex-row items-center gap-10 p-8 border-2 border-amber-400/30 bg-amber-950/20 rounded-lg">
+                            <div className="flex items-center gap-6">
+                                <div className={`w-5 h-5 rounded-full ${user ? 'bg-emerald-400 shadow-[0_0_20px_#34d399]' : 'bg-red-500 shadow-[0_0_20px_#ef4444]'}`} />
+                                <div className="text-amber-400 text-xs md:text-base tracking-[0.5em] font-black">俠客靈壓：{user ? user.uid : "靈脈尚未覺醒"}</div>
+                            </div>
+                            
+                            <div className="h-8 w-[1px] bg-amber-900/50 hidden md:block"></div>
+                            
+                            <div className="flex items-center gap-6">
+                                {isManagement ? (
+                                    <button onClick={handleLogout} className="text-red-500 hover:text-red-300 transition-colors flex items-center gap-3 text-sm font-black tracking-widest uppercase"><LogOut size={20}/> 卸下權限</button>
+                                ) : (
+                                    <button onClick={() => setShowLogin(true)} className="text-amber-700 hover:text-amber-500 transition-colors flex items-center gap-3 text-sm font-black tracking-widest uppercase"><Key size={20}/> 掌門印信</button>
+                                )}
                             </div>
                         </div>
                     </footer>
                 </div>
             );
         }
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>

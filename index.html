@@ -25,7 +25,7 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #78350f; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #b91c1c; }
-        .animate-spin-slow { animation: spin 10s linear infinite; }
+        .animate-spin-slow { animation: spin 15s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
         .title-spacing { letter-spacing: 0.5em; text-indent: 0.5em; }
@@ -74,9 +74,9 @@
             pointer-events: none;
         }
         
-        /* 標題寬鬆行距 */
+        /* 標題寬鬆行距 - 修正 crowded 問題 */
         .wide-leading {
-            line-height: 1.4 !important;
+            line-height: 1.3 !important;
         }
     </style>
 </head>
@@ -209,12 +209,7 @@
                 
                 const unsubE = onSnapshot(eCol, (snapshot) => {
                     const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    list.sort((a, b) => {
-                        const dateA = new Date(a.date);
-                        const dateB = new Date(b.date);
-                        if (dateA.getTime() !== dateB.getTime()) return dateB - dateA;
-                        return (a.sortOrder || 0) - (b.sortOrder || 0);
-                    });
+                    list.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
                     setEvents(list);
                 });
 
@@ -275,48 +270,41 @@
                 setBgUrls([]);
             };
 
-            // 修正版：徹底解決排序問題
+            // 修復：徹底合併與修正 moveItem，解決重複定義與變數錯誤
             const moveItem = async (type, globalIndex, direction) => {
                 if (!isManagement) return;
                 const list = type === 'members' ? members : events;
                 const currentItem = list[globalIndex];
                 if (!currentItem) return;
                 
-                // 找出同組（世代或日期）的兄弟姊妹
-                const groupItems = list.filter(item => {
-                    return type === 'members' ? item.batch === currentItem.batch : item.date === currentItem.date;
-                });
+                // 找出同組（世代）或同頁面的兄弟項目
+                let groupItems;
+                if (type === 'members') {
+                    groupItems = list.filter(item => item.batch === currentItem.batch);
+                } else {
+                    groupItems = list; // 大事編年改為全域移動
+                }
                 
                 const indexInGroup = groupItems.findIndex(i => i.id === currentItem.id);
                 const targetInGroupIndex = indexInGroup + direction;
                 
-                // 修正：校準判斷邏輯，確保不再失效
                 if (targetInGroupIndex < 0 || targetInGroupIndex >= groupItems.length) return;
 
                 const itemA = groupItems[indexInGroup];
                 const itemB = groupItems[targetInGroupIndex];
 
-                // 靈力注入：若原本沒有序號，根據索引分配序號
+                // 如果兩者都沒有 sortOrder，則根據位置賦予預設值
                 let orderA = itemA.sortOrder !== undefined ? itemA.sortOrder : indexInGroup;
                 let orderB = itemB.sortOrder !== undefined ? itemB.sortOrder : targetInGroupIndex;
-
-                // 若序號相同，強行拉開間距
-                if (orderA === orderB) {
-                    orderA = indexInGroup;
-                    orderB = targetInGroupIndex;
-                }
+                
+                if (orderA === orderB) { orderA = indexInGroup; orderB = targetInGroupIndex; }
 
                 try {
                     const batchUpdate = writeBatch(db);
-                    // 核心互換法陣
                     batchUpdate.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemA.id), { sortOrder: orderB });
                     batchUpdate.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemB.id), { sortOrder: orderA });
                     await batchUpdate.commit();
-                    console.log(`【排序】${type} 位序調整完成`);
-                } catch (e) { 
-                    console.error("排序法陣崩潰:", e);
-                    alert("排序調整失敗"); 
-                }
+                } catch (e) { console.error("位序調整失敗", e); }
             };
 
             const handleSubmit = async (e) => {
@@ -330,7 +318,6 @@
                     if (editingId) {
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', colName, editingId), dataToSave);
                     } else {
-                        // 新錄入預設排在最後
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString(), sortOrder: Date.now() });
                     }
                     resetForm();
@@ -481,63 +468,48 @@
                             {activeTab === 'events' && (
                                 <div className="relative max-w-7xl mx-auto py-12 md:py-24 px-4 md:px-8 text-left">
                                     <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-[2px] md:w-[4px] timeline-line -translate-x-1/2" />
-                                    {events.length === 0 ? ( <p className="text-center text-xl md:text-3xl font-black text-amber-800 tracking-[0.5em] py-40">史 冊 空 白 · 待 君 揮 毫</p> ) : (
-                                        sortedEventsList.map((ev, idx) => {
-                                            const eventsOnThisDate = sortedEventsList.filter(e => e.date === ev.date);
-                                            const idxInDateGroup = eventsOnThisDate.findIndex(e => e.id === ev.id);
+                                    {events.length === 0 ? ( 
+                                        <p className="text-center text-xl md:text-3xl font-black text-amber-800 tracking-[0.5em] py-40">史 冊 空 白 · 待 君 揮 毫</p> 
+                                    ) : (
+                                        sortedEventsList.map((ev, idx) => (
+                                            <div key={ev.id} className={`relative flex flex-col md:flex-row items-center justify-between mb-24 md:mb-36 w-full ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
+                                                <div className="hidden md:block w-[42%]" />
+                                                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 w-8 h-8 md:w-14 md:h-14 bg-[#8b0000] border-2 md:border-4 border-amber-500 rounded-full z-10 flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.5)]"><Landmark size={20} className="text-amber-100 md:w-6 md:h-6" /></div>
+                                                <div className="w-full md:w-[48%] pl-16 md:pl-0">
+                                                    <div className="bg-[#14110e]/95 backdrop-blur-sm p-8 md:p-12 border-x-2 md:border-x-4 border-amber-700/30 rounded-xl card-glow relative group overflow-hidden">
+                                                        
+                                                        {isManagement && (
+                                                            <div className={`absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-6 z-50`}>
+                                                                <button onClick={() => moveItem('events', ev.globalIndex, -1)} className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10" disabled={idx === 0}><ChevronUp size={24} /></button>
+                                                                <button onClick={() => moveItem('events', ev.globalIndex, 1)} className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10" disabled={idx === sortedEventsList.length - 1}><ChevronDown size={24} /></button>
+                                                            </div>
+                                                        )}
 
-                                            return (
-                                                <div key={ev.id} className={`relative flex flex-col md:flex-row items-center justify-between mb-24 md:mb-36 w-full ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
-                                                    <div className="hidden md:block w-[42%]" />
-                                                    <div className="absolute left-6 md:left-1/2 -translate-x-1/2 w-8 h-8 md:w-14 md:h-14 bg-[#8b0000] border-2 md:border-4 border-amber-500 rounded-full z-10 flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.5)]"><Landmark size={20} className="text-amber-100 md:w-6 md:h-6" /></div>
-                                                    <div className="w-full md:w-[48%] pl-16 md:pl-0">
-                                                        <div className="bg-[#14110e]/95 backdrop-blur-sm p-8 md:p-12 border-x-2 md:border-x-4 border-amber-700/30 rounded-xl card-glow relative group overflow-hidden">
-                                                            
+                                                        <div className="flex justify-between items-start mb-6 gap-4">
+                                                            <span className="text-amber-500 font-black text-lg md:text-3xl tracking-[0.1em] bg-amber-950/30 px-3 md:px-6 py-1 md:py-2 border border-amber-500/20 whitespace-nowrap">{ev.date}</span>
                                                             {isManagement && (
-                                                                <div className={`absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-6 z-50`}>
-                                                                    <button 
-                                                                        onClick={() => moveItem('events', ev.globalIndex, -1)} 
-                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10"
-                                                                        disabled={idxInDateGroup === 0}
-                                                                    >
-                                                                        <ChevronUp size={24} />
-                                                                    </button>
-                                                                    <button 
-                                                                        onClick={() => moveItem('events', ev.globalIndex, 1)} 
-                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10"
-                                                                        disabled={idxInDateGroup === eventsOnThisDate.length - 1}
-                                                                    >
-                                                                        <ChevronDown size={24} />
-                                                                    </button>
+                                                                <div className="flex gap-4 items-center">
+                                                                    <button onClick={() => { setFormData(ev); setEditingId(ev.id); setIsAdding(true); }} className="p-1 text-amber-600 hover:text-amber-400 transition-colors"><Edit2 size={20}/></button>
+                                                                    <div className="relative">
+                                                                        {confirmDeleteId === ev.id && (
+                                                                            <div className="absolute bottom-full right-0 mb-4 flex flex-col items-end gap-2 z-[110]">
+                                                                                <div className="bg-[#c00000] text-white p-3 text-[10px] font-black border-2 border-[#800000] shadow-3xl rounded-md whitespace-nowrap">確定抹除？</div>
+                                                                                <div className="flex gap-2 mt-2"><button onClick={() => executeDelete(ev.id)} className="bg-red-500 text-white px-3 py-1 text-[8px] font-black">確定</button><button onClick={() => setConfirmDeleteId(null)} className="bg-slate-700 text-white px-3 py-1 text-[8px] font-black">取消</button></div>
+                                                                            </div>
+                                                                        )}
+                                                                        <button onClick={() => setConfirmDeleteId(ev.id)} className={`p-1 transition-colors ${confirmDeleteId === ev.id ? 'text-red-400' : 'text-amber-900 hover:text-red-600'}`}><Trash2 size={20}/></button>
+                                                                    </div>
                                                                 </div>
                                                             )}
-
-                                                            <div className="flex justify-between items-start mb-6 gap-4">
-                                                                <span className="text-amber-500 font-black text-lg md:text-3xl tracking-[0.1em] bg-amber-950/30 px-3 md:px-6 py-1 md:py-2 border border-amber-500/20 whitespace-nowrap">{ev.date}</span>
-                                                                {isManagement && (
-                                                                    <div className="flex gap-4 items-center">
-                                                                        <button onClick={() => { setFormData(ev); setEditingId(ev.id); setIsAdding(true); }} className="p-1 text-amber-600 hover:text-amber-400 transition-colors"><Edit2 size={20}/></button>
-                                                                        <div className="relative">
-                                                                            {confirmDeleteId === ev.id && (
-                                                                                <div className="absolute bottom-full right-0 mb-4 flex flex-col items-end gap-2 z-[110]">
-                                                                                    <div className="bg-[#c00000] text-white p-3 text-[10px] font-black border-2 border-[#800000] shadow-3xl rounded-md whitespace-nowrap">確定抹除？</div>
-                                                                                    <div className="flex gap-2 mt-2"><button onClick={() => executeDelete(ev.id)} className="bg-red-500 text-white px-3 py-1 text-[8px] font-black">確定</button><button onClick={() => setConfirmDeleteId(null)} className="bg-slate-700 text-white px-3 py-1 text-[8px] font-black">取消</button></div>
-                                                                                </div>
-                                                                            )}
-                                                                            <button onClick={() => setConfirmDeleteId(ev.id)} className={`p-1 transition-colors ${confirmDeleteId === ev.id ? 'text-red-400' : 'text-amber-900 hover:text-red-600'}`}><Trash2 size={20}/></button>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <h3 className="text-3xl md:text-5xl font-black text-amber-50 mb-4 md:mb-8 glow-text tracking-widest break-words wide-leading pr-10">{ev.title}</h3>
-                                                            <span className="inline-block bg-[#600000] text-amber-100 text-[10px] md:text-xs px-4 py-1 font-bold tracking-[0.3em] mb-6 md:mb-10 uppercase font-black">{ev.eventType}</span>
-                                                            <p className="text-amber-100/80 text-lg md:text-2xl font-serif italic description-content pr-10">{ev.description}</p>
-                                                            {ev.imageUrl && <img src={ev.imageUrl} className="mt-8 md:mt-12 w-full h-auto max-h-[400px] object-cover rounded-sm border-2 md:border-4 border-[#1e1a16] opacity-80 shadow-2xl" />}
                                                         </div>
+                                                        <h3 className="text-3xl md:text-5xl font-black text-amber-50 mb-4 md:mb-8 glow-text tracking-widest break-words wide-leading pr-10">{ev.title}</h3>
+                                                        <span className="inline-block bg-[#600000] text-amber-100 text-[10px] md:text-xs px-4 py-1 font-bold tracking-[0.3em] mb-6 md:mb-10 uppercase font-black">{ev.eventType}</span>
+                                                        <p className="text-amber-100/80 text-lg md:text-2xl font-serif italic description-content pr-10">{ev.description}</p>
+                                                        {ev.imageUrl && <img src={ev.imageUrl} className="mt-8 md:mt-12 w-full h-auto max-h-[400px] object-cover rounded-sm border-2 md:border-4 border-[#1e1a16] opacity-80 shadow-2xl" />}
                                                     </div>
                                                 </div>
-                                            );
-                                        })
+                                            </div>
+                                        ))
                                     )}
                                 </div>
                             )}
@@ -603,7 +575,7 @@
                                     {activeTab === 'members' ? (
                                         <><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">俠 客 名 諱</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">所 屬 流 派</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-100" value={formData.jobClass} onChange={e => setFormData({...formData, jobClass: e.target.value})}>{CLASSES.map(c => <option key={c} value={c}>{c}</option>)}</select></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">傳 承 世 代 (數字)</label><input type="number" className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-100" value={formData.batch} onChange={e => setFormData({...formData, batch: parseInt(e.target.value)||1})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">曾 任 職 位</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-100" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">活 躍 時 期</label><input className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-100" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} /></div></>
                                     ) : (
-                                        <><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-100" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 日 期 (例: 2024.01.01)</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-100" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-100" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div></>
+                                        <><div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12"><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 標 題</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none focus:border-amber-400 text-amber-100" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 時 期 / 日 期</label><input required className="w-full bg-transparent border-b border-amber-500/20 p-2 md:p-4 text-xl md:text-3xl outline-none text-amber-100" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div></div><div className="space-y-2"><label className="text-xs text-amber-50 font-black">事 件 類 型</label><select className="w-full bg-black/60 border-b border-amber-500/20 p-2 md:p-4 text-lg md:text-2xl outline-none text-amber-100" value={formData.eventType} onChange={e => setFormData({...formData, eventType: e.target.value})}>{EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div></>
                                     )}
                                     <div className="space-y-4"><label className="text-xs text-amber-50 font-black block">畫 像 網 址 / 上 傳</label><div className="flex flex-col md:flex-row gap-4 p-4 border border-amber-500/20 bg-black/40 rounded-xl"><input placeholder="外部畫像網址..." className="flex-1 bg-transparent border-b border-amber-500/20 p-2 text-sm italic text-amber-100 outline-none" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} /><button type="button" onClick={() => fileInputRef.current?.click()} className="px-6 py-3 border border-amber-500/40 text-xs font-black uppercase text-amber-400">{isCompressing ? '凝氣中...' : '選取本地畫像'}</button></div></div>
                                     <div className="space-y-4"><label className="text-xs text-amber-50 font-black">誌 異 / 詳 情</label><textarea rows="5" className="w-full bg-black/50 border border-amber-500/20 p-4 md:p-8 text-lg md:text-xl italic font-serif outline-none text-amber-100" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>

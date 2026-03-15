@@ -275,13 +275,14 @@
                 setBgUrls([]);
             };
 
-            // 修正：修正排序函數中的變量名稱錯誤 (targetInBatchIndex -> targetInGroupIndex)
-            const moveItem = async (type, currentIndex, direction) => {
+            // 修正版：徹底解決排序問題
+            const moveItem = async (type, globalIndex, direction) => {
                 if (!isManagement) return;
                 const list = type === 'members' ? members : events;
-                const currentItem = list[currentIndex];
+                const currentItem = list[globalIndex];
                 if (!currentItem) return;
                 
+                // 找出同組（世代或日期）的兄弟姊妹
                 const groupItems = list.filter(item => {
                     return type === 'members' ? item.batch === currentItem.batch : item.date === currentItem.date;
                 });
@@ -289,21 +290,33 @@
                 const indexInGroup = groupItems.findIndex(i => i.id === currentItem.id);
                 const targetInGroupIndex = indexInGroup + direction;
                 
-                // 修正：校準邊界檢查變量
+                // 修正：校準判斷邏輯，確保不再失效
                 if (targetInGroupIndex < 0 || targetInGroupIndex >= groupItems.length) return;
 
                 const itemA = groupItems[indexInGroup];
                 const itemB = groupItems[targetInGroupIndex];
 
-                const orderA = itemA.sortOrder || Date.now();
-                const orderB = itemB.sortOrder || (Date.now() + (direction * 1000));
+                // 靈力注入：若原本沒有序號，根據索引分配序號
+                let orderA = itemA.sortOrder !== undefined ? itemA.sortOrder : indexInGroup;
+                let orderB = itemB.sortOrder !== undefined ? itemB.sortOrder : targetInGroupIndex;
+
+                // 若序號相同，強行拉開間距
+                if (orderA === orderB) {
+                    orderA = indexInGroup;
+                    orderB = targetInGroupIndex;
+                }
 
                 try {
-                    const batch = writeBatch(db);
-                    batch.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemA.id), { sortOrder: orderB });
-                    batch.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemB.id), { sortOrder: orderA });
-                    await batch.commit();
-                } catch (e) { alert("排序調整失敗"); }
+                    const batchUpdate = writeBatch(db);
+                    // 核心互換法陣
+                    batchUpdate.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemA.id), { sortOrder: orderB });
+                    batchUpdate.update(doc(db, 'artifacts', appId, 'public', 'data', type, itemB.id), { sortOrder: orderA });
+                    await batchUpdate.commit();
+                    console.log(`【排序】${type} 位序調整完成`);
+                } catch (e) { 
+                    console.error("排序法陣崩潰:", e);
+                    alert("排序調整失敗"); 
+                }
             };
 
             const handleSubmit = async (e) => {
@@ -317,6 +330,7 @@
                     if (editingId) {
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', colName, editingId), dataToSave);
                     } else {
+                        // 新錄入預設排在最後
                         await addDoc(colRef, { ...dataToSave, createdAt: new Date().toISOString(), sortOrder: Date.now() });
                     }
                     resetForm();
@@ -431,8 +445,8 @@
                                                                 <div className="w-full pr-12">
                                                                     <h3 className="text-3xl md:text-6xl font-black text-amber-50 tracking-widest glow-text mb-6 break-words wide-leading">{member.name}</h3>
                                                                     <div className="flex flex-wrap gap-6 md:gap-10 text-amber-400 font-black tracking-[0.2em] md:tracking-[0.4em] text-sm md:text-xl uppercase">
-                                                                        <span className="flex items-center gap-2 text-amber-500"><Shield size={24}/>{member.position}</span>
-                                                                        <span className="flex items-center gap-2 text-amber-500"><Crosshair size={24}/>{member.jobClass}</span>
+                                                                        <span className="flex items-center gap-2 text-amber-500 font-black"><Shield size={24}/>{member.position}</span>
+                                                                        <span className="flex items-center gap-2 text-amber-500 font-black"><Crosshair size={24}/>{member.jobClass}</span>
                                                                     </div>
                                                                 </div>
                                                                 {isManagement && (
@@ -451,7 +465,7 @@
                                                                 )}
                                                             </div>
                                                             <p className="text-amber-50/90 text-lg md:text-2xl italic font-serif mb-8 md:mb-12 pl-4 md:pl-10 border-l-2 md:border-l-4 border-amber-500/30 description-content pr-12">「{member.description || '隱 世 高 人，未 曾 留 下 隻 言 片 語。'}」</p>
-                                                            <div className="text-xs md:text-lg text-amber-400 font-black uppercase tracking-[0.3em] md:tracking-[0.6em] flex items-center gap-3 md:gap-5 border-t md:border-t-2 border-amber-500/10 pt-6 md:pt-10"><History size={24} className="text-amber-600" /> 活躍時期：{member.period || '不詳'}</div>
+                                                            <div className="text-xs md:text-xl text-amber-400 font-black uppercase tracking-[0.3em] md:tracking-[0.6em] flex items-center gap-3 md:gap-5 border-t md:border-t-2 border-amber-500/10 pt-6 md:pt-10"><History size={24} className="text-amber-600" /> 活躍時期：{member.period || '不詳'}</div>
                                                         </div>
                                                         <div className="w-full md:w-[35%] aspect-[3/4] bg-black border-8 md:border-[16px] border-[#1e1a16] shadow-xl overflow-hidden rounded-sm relative">
                                                             {member.imageUrl ? <img src={member.imageUrl} className="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-1000" /> : <div className="h-full flex flex-col items-center justify-center text-amber-900/10"><Ghost size={80}/><span className="text-sm md:text-lg tracking-[1em] font-black uppercase">影跡全無</span></div>}
@@ -469,7 +483,6 @@
                                     <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-[2px] md:w-[4px] timeline-line -translate-x-1/2" />
                                     {events.length === 0 ? ( <p className="text-center text-xl md:text-3xl font-black text-amber-800 tracking-[0.5em] py-40">史 冊 空 白 · 待 君 揮 毫</p> ) : (
                                         sortedEventsList.map((ev, idx) => {
-                                            // 找出同日期的事件群組，用於判斷按鈕是否 Disabled
                                             const eventsOnThisDate = sortedEventsList.filter(e => e.date === ev.date);
                                             const idxInDateGroup = eventsOnThisDate.findIndex(e => e.id === ev.id);
 
@@ -484,14 +497,14 @@
                                                                 <div className={`absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-6 z-50`}>
                                                                     <button 
                                                                         onClick={() => moveItem('events', ev.globalIndex, -1)} 
-                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-5"
+                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10"
                                                                         disabled={idxInDateGroup === 0}
                                                                     >
                                                                         <ChevronUp size={24} />
                                                                     </button>
                                                                     <button 
                                                                         onClick={() => moveItem('events', ev.globalIndex, 1)} 
-                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-5"
+                                                                        className="p-1.5 bg-amber-900/20 hover:bg-amber-500 rounded-full text-amber-400 hover:text-black transition-all disabled:opacity-10"
                                                                         disabled={idxInDateGroup === eventsOnThisDate.length - 1}
                                                                     >
                                                                         <ChevronDown size={24} />
@@ -517,7 +530,7 @@
                                                                 )}
                                                             </div>
                                                             <h3 className="text-3xl md:text-5xl font-black text-amber-50 mb-4 md:mb-8 glow-text tracking-widest break-words wide-leading pr-10">{ev.title}</h3>
-                                                            <span className="inline-block bg-[#600000] text-amber-100 text-[10px] md:text-xs px-4 py-1 font-bold tracking-[0.3em] mb-6 md:mb-10 uppercase">{ev.eventType}</span>
+                                                            <span className="inline-block bg-[#600000] text-amber-100 text-[10px] md:text-xs px-4 py-1 font-bold tracking-[0.3em] mb-6 md:mb-10 uppercase font-black">{ev.eventType}</span>
                                                             <p className="text-amber-100/80 text-lg md:text-2xl font-serif italic description-content pr-10">{ev.description}</p>
                                                             {ev.imageUrl && <img src={ev.imageUrl} className="mt-8 md:mt-12 w-full h-auto max-h-[400px] object-cover rounded-sm border-2 md:border-4 border-[#1e1a16] opacity-80 shadow-2xl" />}
                                                         </div>
